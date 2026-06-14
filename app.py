@@ -18,7 +18,7 @@ st.markdown("""
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     </style>
-""", unsafe_approval_html=True)
+""", unsafe_allow_html=True)
 
 @st.cache_data(ttl=600)
 def load_data():
@@ -47,7 +47,7 @@ def main():
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
-        filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
+        filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_model['Clean_Model'] == selected_model]
         
         selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
 
@@ -97,7 +97,7 @@ def main():
                                     
                                     if img_file is not None:
                                         if st.button(f"Submit Photo for {col}", key=f"btn_{col}"):
-                                            # Convert image to base64
+                                            # Convert image to base64 for transmission
                                             bytes_data = img_file.getvalue()
                                             base64_str = base64.b64encode(bytes_data).decode('utf-8')
                                             
@@ -138,3 +138,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
