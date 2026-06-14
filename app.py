@@ -45,9 +45,15 @@ def main():
     if not st.session_state.show_results:
         st.subheader("Search Specs")
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
+        
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
+        
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
-        filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_model['Clean_Model'] == selected_model]
+        
+        if not selected_model:
+            filtered_by_model = filtered_by_make
+        else:
+            filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         
         selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
 
@@ -85,11 +91,9 @@ def main():
                             else:
                                 st.write("*No data yet*")
                                 
-                                # --- PHOTO LOGIC (Choice: Upload or Camera) ---
                                 if "photo" in col.lower():
                                     action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{col}")
                                     img_file = None
-                                    
                                     if action == "Upload Photo":
                                         img_file = st.file_uploader(f"Choose file for {col}", type=['jpg', 'png', 'jpeg'], key=f"uploader_{col}")
                                     else:
@@ -97,23 +101,14 @@ def main():
                                     
                                     if img_file is not None:
                                         if st.button(f"Submit Photo for {col}", key=f"btn_{col}"):
-                                            # Convert image to base64 for transmission
                                             bytes_data = img_file.getvalue()
                                             base64_str = base64.b64encode(bytes_data).decode('utf-8')
-                                            
-                                            payload = {
-                                                "type": "photo", 
-                                                "make": record['Make'], 
-                                                "model": record['Model'], 
-                                                "column": col, 
-                                                "image": base64_str
-                                            }
+                                            payload = {"type": "photo", "make": record['Make'], "model": record['Model'], "column": col, "image": base64_str}
                                             try:
                                                 requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
                                                 st.success("Photo uploaded successfully!")
                                             except: st.error("Error uploading photo.")
                                 else:
-                                    # Standard text input form
                                     with st.form(f"form_{col}_{record.name}"):
                                         new_val = st.text_input(f"Add info for {col}")
                                         if st.form_submit_button("Submit for Approval"):
@@ -138,4 +133,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
