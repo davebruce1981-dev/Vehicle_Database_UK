@@ -44,8 +44,24 @@ def main():
 
     if not st.session_state.show_results:
         st.subheader("Search Specs")
+
+        # --- SEARCH LOGIC ---
+        selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
+        filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
-        # --- REPORT MISSING VEHICLE EXPANDER ---
+        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
+        filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
+        
+        selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
+
+        if st.button("🔍 SEARCH SPECS", use_container_width=True):
+            st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
+            st.session_state.show_results = True
+            st.rerun()
+            
+        st.divider()
+
+        # --- REPORT MISSING VEHICLE (Moved Below Search) ---
         with st.expander("➕ Report Missing Vehicle"):
             with st.form("missing_vehicle_form"):
                 n_make = st.text_input("Make")
@@ -66,32 +82,6 @@ def main():
                         st.success("Request submitted to 'Requests' tab!")
                     except: 
                         st.error("Error submitting.")
-        
-        st.divider()
-
-        # --- SEARCH LOGIC ---
-        selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
-        
-        # Initial filter
-        filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
-        
-        # Model selection
-        model_options = [""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str))
-        selected_model = st.selectbox("MODEL", options=model_options)
-        
-        # Set filter based on selection
-        if not selected_model:
-            filtered_by_model = filtered_by_make
-        else:
-            filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
-        
-        # Year selection
-        selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
-
-        if st.button("🔍 SEARCH SPECS", use_container_width=True):
-            st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
-            st.session_state.show_results = True
-            st.rerun()
 
     else:
         results = st.session_state.results
