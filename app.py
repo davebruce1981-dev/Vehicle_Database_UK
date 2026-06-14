@@ -1,6 +1,3 @@
-Here is the complete, copyable app.py code.
-
-Python
 import streamlit as st
 import pandas as pd
 import re
@@ -32,7 +29,7 @@ st.markdown("""
         background-color: #333333 !important; 
         color: #ffffff !important; 
         border: 2px solid #555555 !important;
-        font-weight: bold; 
+        font-weight: bold;
         width: 100%;
     }
     
