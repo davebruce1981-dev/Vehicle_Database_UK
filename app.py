@@ -78,7 +78,12 @@ def main():
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
-        filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_model['Clean_Model'] == selected_model]
+        
+        # Logic fix for UnboundLocalError
+        if not selected_model:
+            filtered_by_model = filtered_by_make
+        else:
+            filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         
         selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
 
