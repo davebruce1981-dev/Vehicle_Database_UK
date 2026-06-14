@@ -20,6 +20,20 @@ st.markdown("""
     }
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
+    
+    /* --- MAGIC HAMBURGER CSS --- */
+    /* Hide the default Streamlit arrows */
+    [data-testid="collapsedControl"] svg {
+        display: none !important;
+    }
+    /* Replace with Hamburger icon */
+    [data-testid="collapsedControl"]::after {
+        content: "☰";
+        font-size: 26px;
+        color: #ffffff;
+        font-weight: bold;
+        padding-left: 5px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -60,11 +74,9 @@ def show_sidebar_menu():
                 st.error("Your Sidebar tab must have columns named: Category, Sub-Category, Link")
                 return
             
-            # Get valid categories (ignoring empty category cells)
             categories = side_df['Category'].dropna().unique()
 
             for cat in categories:
-                # Ensure the category name isn't just empty space
                 if is_valid(cat):
                     st.subheader(f"🗂️ {cat}")
                     subset = side_df[side_df['Category'] == cat]
@@ -73,27 +85,21 @@ def show_sidebar_menu():
                         sub_cat = str(row.get('Sub-Category', 'Resource')).strip()
                         link = str(row.get('Link', '')).strip()
                         
-                        # --- THE TESTING FIX ---
-                        # If the link is totally blank or just empty space, inject a dummy link
                         if not is_valid(link) or link == 'nan':
                             link = "https://example.com"
-                        # If they typed something but forgot "http", add it
                         elif not link.startswith("http"):
                             link = "https://" + link
                             
-                        # Show the button, even if it's using the dummy link!
                         if is_valid(sub_cat) and sub_cat != 'nan':
                             st.link_button(f"🔗 {sub_cat}", url=link, use_container_width=True)
                     
-                    st.write("") # Add a little space between categories
+                    st.write("") 
 
     except Exception as e:
         st.sidebar.error(f"Sidebar error: {e}")
 
 # --- MAIN APP ---
 def main():
-    show_sidebar_menu()
-
     col1, col2, col3 = st.columns([1, 4, 1]) 
     try:
         st.image("Recoveryspecs logo.jpeg", use_container_width=True)
@@ -107,6 +113,9 @@ def main():
     if 'show_results' not in st.session_state: st.session_state.show_results = False
 
     if not st.session_state.show_results:
+        # ONLY show the sidebar menu on the main search page
+        show_sidebar_menu()
+
         st.subheader("Search Specs")
 
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
@@ -143,6 +152,13 @@ def main():
                     except: st.error("Error submitting.")
 
     else:
+        # HIDE the hamburger toggle button entirely on the results page
+        st.markdown("""
+            <style>
+            [data-testid="collapsedControl"] { display: none !important; }
+            </style>
+        """, unsafe_allow_html=True)
+
         results = st.session_state.results
         if len(results) == 1:
             record = results.iloc[0]
