@@ -36,7 +36,6 @@ def main():
     with col2: st.image("Recoveryspecs logo.jpeg", use_container_width=True)
 
     df = load_data()
-    # Logic to clean models
     if 'Model' in df.columns:
         df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
     
@@ -46,8 +45,7 @@ def main():
         st.subheader("Search Specs")
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
-        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_model['Clean_Model'].unique().astype(str)) if 'filtered_by_model' in locals() else [])
-        # Simplified filtering for display logic
+        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
         filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         
         selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
@@ -85,12 +83,12 @@ def main():
                                 st.write(val)
                             else:
                                 st.write("*No data yet*")
-                                # --- PHOTO LOGIC STARTS HERE ---
-                                if "photo" in col.lower("📸 Upload/Take Photo (Google Form)", "https://forms.gle/6DuUFUWk5tGRFPmu5"):
-                                    # REPLACE THE LINK BELOW WITH YOUR ACTUAL GOOGLE FORM LINK
-                                    st.link_button()
+                                
+                                # --- CORRECTED PHOTO LOGIC ---
+                                if "photo" in col.lower():
+                                    st.link_button("📸 Upload/Take Photo (Google Form)", "https://forms.gle/6DuUFUWk5tGRFPmu5")
                                 else:
-                                    # Standard text input for info
+                                    # Standard text input form
                                     with st.form(f"form_{col}_{record.name}"):
                                         new_val = st.text_input(f"Add info for {col}")
                                         if st.form_submit_button("Submit for Approval"):
@@ -102,6 +100,7 @@ def main():
                             
                             displayed.add(col)
                             found_any = True
+                    if not found_any: st.info("No specific data found for this category.")
             
             if st.button("⬅ Back to Search"):
                 st.session_state.show_results = False
