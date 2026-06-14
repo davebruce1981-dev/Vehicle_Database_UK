@@ -46,7 +46,10 @@ st.markdown("""
         color: #f6782a !important;
     }
 
-    .result-header { font-size: 1.25em !important; color: #f6782a !important; font-weight: bold; }
+    .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
+    
+    /* Style Streamlit Expanders to look cleaner in dark mode */
+    .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -108,12 +111,67 @@ def main():
         if len(results) == 1:
             st.subheader("Vehicle Details")
             record = results.iloc[0]
-            for col in results.columns:
-                if col in ['Clean_Model', 'Model', 'Make']: continue
-                st.markdown(f'<p class="result-header">{col}:</p>', unsafe_allow_html=True)
-                st.write(str(record[col]))
             
-            # Spacing before back button on details page
+            # Smart helper to find exact column matching names case-insensitively
+            def find_col(name):
+                for c in record.index:
+                    if c.strip().lower() == name.strip().lower(): return c
+                return None
+
+            make_c = find_col("Make")
+            model_c = find_col("Model")
+            year_c = find_col("Year Range")
+            fuel_c = find_col("Fuel Type")
+            drive_c = find_col("Drivetrain")
+
+            # --- 1. PERSISTENT CORE DETAILS (Always Visible) ---
+            brand = str(record[make_c]) if make_c else ""
+            model_name = str(record[model_c]) if model_c else ""
+            st.markdown(f"## {brand} {model_name}")
+            
+            # Displays core specs cleanly in columns
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown(f"**YEAR RANGE:** {record[year_c] if year_c else 'N/A'}")
+                st.markdown(f"**FUEL TYPE:** {record[fuel_c] if fuel_c else 'N/A'}")
+            with c2:
+                st.markdown(f"**DRIVETRAIN:** {record[drive_c] if drive_c else 'N/A'}")
+            
+            st.divider()
+
+            # --- 2. CLICKABLE EXPANDABLE SECTIONS ---
+            # Define target keywords for grouped dropdowns
+            sections = {
+                "🪫 BATTERY DETAILS": ["battery", "hybrid", "voltage", "12v"],
+                "🏋️ JACKING POINTS": ["jack", "jacking", "lift", "point"],
+                "🔌 OBD LOCATION": ["obd", "odb", "diagnostic", "port"]
+            }
+
+            # Track columns already displayed so we don't duplicate them
+            displayed_cols = {make_c, model_c, year_c, fuel_c, drive_c, 'Clean_Model', 'Model', 'Make'}
+
+            for label, keywords in sections.items():
+                # Find all columns that match keywords for this group
+                matched_cols = [c for c in record.index if any(kw in c.lower() for kw in keywords) and c not in displayed_cols]
+                
+                with st.expander(label):
+                    if matched_cols:
+                        for col in matched_cols:
+                            st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
+                            st.write(str(record[col]))
+                            displayed_cols.add(col)
+                    else:
+                        st.info("No specific data found for this category.")
+
+            # Catch-all dropdown for any other columns inside your spreadsheet
+            other_cols = [c for c in record.index if c not in displayed_cols]
+            if other_cols:
+                with st.expander("🔍 ADDITIONAL SPECIFICATIONS"):
+                    for col in other_cols:
+                        st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
+                        st.write(str(record[col]))
+            
+            # Spacing and Back Button
             st.markdown("<br><br>", unsafe_allow_html=True)
             with st.container(border=False):
                 st.markdown('<div class="back-btn-container">', unsafe_allow_html=True)
@@ -124,15 +182,11 @@ def main():
         else:
             st.subheader(f"Found {len(results)} Results")
             for idx, row in results.iterrows():
-                # Added use_container_width=True to make buttons perfectly uniform in size
                 if st.button(f"{row['Make']} | {row['Model']} | {row['Year Range']}", key=f"list_{idx}", use_container_width=True):
                     st.session_state.results = results.loc[[idx]]
                     st.rerun()
             
-            # Adds 3 empty line spaces right before the back button
             st.markdown("<br><br><br>", unsafe_allow_html=True)
-            
-            # Places the back button in a custom styled container
             with st.container(border=False):
                 st.markdown('<div class="back-btn-container">', unsafe_allow_html=True)
                 if st.button("⬅ Back to Search", key="back_from_list"):
