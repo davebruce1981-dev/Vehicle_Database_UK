@@ -1,3 +1,4 @@
+Python
 import streamlit as st
 import pandas as pd
 import re
@@ -111,9 +112,19 @@ def main():
                             if is_valid(val):
                                 # Check if it is a photo column or image link
                                 if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
+                                    
+                                    # --- GOOGLE DRIVE DIRECT LINK CONVERTER ---
+                                    img_src = val
+                                    if "drive.google.com/file/d/" in val:
+                                        match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', val)
+                                        if match:
+                                            file_id = match.group(1)
+                                            img_src = f"https://drive.google.com/uc?export=view&id={file_id}"
+                                    # ------------------------------------------
+
                                     st.markdown(f"""
                                         <a href="{val}" target="_blank">
-                                            <img src="{val}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
+                                            <img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
                                         </a>
                                     """, unsafe_allow_html=True)
                                 elif "http" in val.lower():
@@ -145,7 +156,7 @@ def main():
                 for col in record.index:
                     if col not in displayed and is_valid(record[col]):
                         val = str(record[col])
-                        # Reverted this back to standard link buttons
+                        # Standard link buttons for Other Specs
                         if "http" in val.lower() or "link" in col.lower() or "yuasa" in col.lower() or "dvla" in col.lower():
                             st.link_button(f"🌐 {col}", url=val, use_container_width=True)
                         else:
