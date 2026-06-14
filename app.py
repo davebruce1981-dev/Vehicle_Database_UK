@@ -1,3 +1,7 @@
+Here is the complete, final code for your app.py file. It includes the updated Google Sheets link pointing to the Vehicle_Library tab, the correct filename for your new logo, and the form setup.
+
+The Complete app.py Code
+Python
 import streamlit as st
 import pandas as pd
 import re
@@ -41,7 +45,8 @@ st.markdown("""
 
 @st.cache_data(ttl=600)
 def load_data():
-    url = "https://docs.google.com/spreadsheets/d/1dTq4EZmYsfl4C8zsNYsT1dRwB37Os9RW/gviz/tq?tqx=out:csv&sheet=Sheet1"
+    # Pulls directly from the Vehicle_Library tab of your new sheet
+    url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
     df = pd.read_csv(url)
     df.columns = df.columns.str.strip()
     return df
@@ -49,7 +54,8 @@ def load_data():
 def main():
     col1, col2, col3 = st.columns([1, 4, 1]) 
     with col2:
-        st.image("WhatsApp Image 2026-06-09 at 15.53.35.jpeg", use_container_width=True)
+        # Pulls your exact logo file from the GitHub repository
+        st.image("Recoveryspecs logo.jpeg", use_container_width=True)
 
     df = load_data()
     if 'Model' in df.columns:
@@ -82,7 +88,8 @@ def main():
                 details = st.text_area("Details")
                 
                 if st.form_submit_button("Send Request"):
-                    url = "https://script.google.com/macros/s/AKfycbwBAgimuEZD_reXRyS1YETk0Le2-6JiZyYNccQ4fC6RQoLcUwvzTFEAVBBWLH3-jbI6dQ/exec"
+                    # IMPORTANT: Paste your new Google Apps Script Web App URL exactly inside these quotes!
+                    url = "https://script.google.com/macros/s/YOUR_NEW_WEB_APP_URL_HERE/exec"
                     try:
                         payload = {"make": make, "model": model, "year": year, "details": details}
                         response = requests.post(url, json=payload, timeout=10)
