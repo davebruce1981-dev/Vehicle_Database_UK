@@ -1,4 +1,4 @@
-import streamlit as st
+        import streamlit as st
 import pandas as pd
 import re
 import requests
@@ -6,6 +6,9 @@ import base64
 
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="Recovery Specs", layout="centered")
+
+# CENTRALIZED URL (Change this once, and it updates everywhere)
+GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcjYzl5kmbGMfy90KXxO8b18E-eWYK-Xc9EAOxwROFtDoOQHePYduTXMEfiTarb7Jh/exec"
 
 st.markdown("""
     <style>
@@ -24,7 +27,7 @@ st.markdown("""
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
     df = pd.read_csv(url)
-    df.columns = df.columns.str.strip() # Removes whitespace from headers
+    df.columns = df.columns.str.strip() 
     return df
 
 def is_valid(val):
@@ -45,13 +48,11 @@ def main():
     if not st.session_state.show_results:
         st.subheader("Search Specs")
 
-        # --- SEARCH LOGIC ---
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
         
-        # Robust filtering to avoid errors
         if not selected_model:
             filtered_by_model = filtered_by_make
         else:
@@ -66,7 +67,6 @@ def main():
             
         st.divider()
 
-        # --- REPORT MISSING VEHICLE ---
         with st.expander("➕ Report Missing Vehicle"):
             with st.form("missing_vehicle_form", clear_on_submit=True):
                 n_make = st.text_input("Make")
@@ -77,7 +77,7 @@ def main():
                 if st.form_submit_button("Submit Request"):
                     payload = {"type": "new_request", "make": n_make, "model": n_model, "year": n_year, "details": n_details}
                     try:
-                        requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
+                        requests.post(GOOGLE_SCRIPT_URL, json=payload)
                         st.success("Request submitted successfully!")
                     except: st.error("Error submitting.")
 
@@ -114,25 +114,22 @@ def main():
                                     if img_file and st.button(f"Submit Photo for {col}", key=f"btn_{col}"):
                                         bytes_data = img_file.getvalue()
                                         base64_str = base64.b64encode(bytes_data).decode('utf-8')
-                                        requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json={"type": "photo", "make": record['Make'], "model": record['Model'], "column": col, "image": base64_str})
+                                        requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record['Make'], "model": record['Model'], "column": col, "image": base64_str})
                                         st.success("Uploaded!")
                                 else:
                                     with st.form(f"form_{col}_{record.name}"):
                                         new_val = st.text_input(f"Add info")
                                         if st.form_submit_button("Submit"):
-                                            requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json={"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val})
+                                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val})
                                             st.success("Submitted!")
                             displayed.add(col)
                             found_any = True
             
-            # --- OTHER SPECIFICATIONS ---
             with st.expander("⚙️ OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
-                    # We check if it is not a technical column and has valid data
                     if col not in displayed and is_valid(record[col]):
                         val = str(record[col])
-                        # Link detection
                         if "http" in val.lower() or "link" in col.lower() or "yuasa" in col.lower() or "dvla" in col.lower():
                             st.link_button(f"🌐 {col}", url=val, use_container_width=True)
                         else:
