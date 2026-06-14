@@ -1,4 +1,4 @@
-        import streamlit as st
+import streamlit as st
 import pandas as pd
 import re
 import requests
@@ -37,7 +37,12 @@ def is_valid(val):
 
 def main():
     col1, col2, col3 = st.columns([1, 4, 1]) 
-    with col2: st.image("Recoveryspecs logo.jpeg", use_container_width=True)
+    # Ensure you have your logo file in the same folder as app.py
+    # If you don't have the logo file, comment out the line below with a #
+    try:
+        st.image("Recoveryspecs logo.jpeg", use_container_width=True)
+    except:
+        pass
 
     df = load_data()
     if 'Model' in df.columns:
@@ -99,7 +104,6 @@ def main():
             
             for label, keywords in sections.items():
                 with st.expander(label):
-                    found_any = False
                     for col in record.index:
                         if any(k in col.lower() for k in keywords) and col not in displayed:
                             val = str(record[col])
@@ -123,7 +127,6 @@ def main():
                                             requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val})
                                             st.success("Submitted!")
                             displayed.add(col)
-                            found_any = True
             
             with st.expander("⚙️ OTHER SPECIFICATIONS"):
                 found_other = False
