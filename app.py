@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import re
 import requests
+import base64
 
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="Recovery Specs", layout="centered")
@@ -84,9 +85,26 @@ def main():
                             else:
                                 st.write("*No data yet*")
                                 
-                                # --- CORRECTED PHOTO LOGIC ---
+                                # --- PHOTO LOGIC ---
                                 if "photo" in col.lower():
-                                    st.link_button("📸 Upload/Take Photo (Google Form)", "https://forms.gle/6DuUFUWk5tGRFPmu5")
+                                    img_file = st.camera_input(f"Take photo for {col}")
+                                    if img_file is not None:
+                                        if st.button("Upload Photo"):
+                                            # Convert image to base64 for transmission
+                                            bytes_data = img_file.getvalue()
+                                            base64_str = base64.b64encode(bytes_data).decode('utf-8')
+                                            
+                                            payload = {
+                                                "type": "photo", 
+                                                "make": record['Make'], 
+                                                "model": record['Model'], 
+                                                "column": col, 
+                                                "image": base64_str
+                                            }
+                                            try:
+                                                requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
+                                                st.success("Photo uploaded successfully!")
+                                            except: st.error("Error uploading photo.")
                                 else:
                                     # Standard text input form
                                     with st.form(f"form_{col}_{record.name}"):
