@@ -10,29 +10,10 @@ st.markdown("""
     <style>
     .stApp { background-color: #000000 !important; }
     h1, h2, h3, h4, p, label { color: #ffffff !important; }
-    
     div[data-testid="stVerticalBlock"] div.stButton > button, 
     div[data-testid="stFormSubmitButton"] button { 
-        background-color: #f6782a !important; 
-        color: white !important; 
-        width: 100%; 
-        font-weight: bold; 
-        border: none !important;
+        background-color: #f6782a !important; color: white !important; width: 100%; font-weight: bold; border: none !important;
     }
-    
-    div.stButton > button[key^="list_"] { 
-        background-color: #f6782a !important; 
-        color: white !important; 
-    }
-
-    div.back-btn-container div[data-testid="stButton"] button {
-        background-color: #333333 !important; 
-        color: #ffffff !important; 
-        border: 2px solid #555555 !important;
-        font-weight: bold; 
-        width: 100%;
-    }
-    
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     </style>
@@ -55,6 +36,7 @@ def main():
     with col2: st.image("Recoveryspecs logo.jpeg", use_container_width=True)
 
     df = load_data()
+    # Logic to clean models
     if 'Model' in df.columns:
         df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
     
@@ -64,8 +46,8 @@ def main():
         st.subheader("Search Specs")
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
-        
-        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
+        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_model['Clean_Model'].unique().astype(str)) if 'filtered_by_model' in locals() else [])
+        # Simplified filtering for display logic
         filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         
         selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
@@ -79,9 +61,6 @@ def main():
         if len(results) == 1:
             record = results.iloc[0]
             st.subheader(f"{record.get('Make', '')} {record.get('Model', '')}")
-            
-            st.markdown(f"**YEAR:** {record.get('Year Range', 'N/A')} | **FUEL:** {record.get('Fuel Type', 'N/A')}")
-            st.markdown(f"**DRIVE:** {record.get('Drivetrain', 'N/A')}")
             st.divider()
 
             sections = {
@@ -106,39 +85,23 @@ def main():
                                 st.write(val)
                             else:
                                 st.write("*No data yet*")
-                                
-                                # Logic: Check if it's a photo field or a text field
-                                if "photo" in col.lower():
-                                    st.link_button("📸 Upload/Take Photo (Google Form)", "YOUR_GOOGLE_FORM_URL_HERE")
+                                # --- PHOTO LOGIC STARTS HERE ---
+                                if "photo" in col.lower("📸 Upload/Take Photo (Google Form)", "https://forms.gle/6DuUFUWk5tGRFPmu5"):
+                                    # REPLACE THE LINK BELOW WITH YOUR ACTUAL GOOGLE FORM LINK
+                                    st.link_button()
                                 else:
-                                    # Text input form for non-photo data
+                                    # Standard text input for info
                                     with st.form(f"form_{col}_{record.name}"):
                                         new_val = st.text_input(f"Add info for {col}")
                                         if st.form_submit_button("Submit for Approval"):
-                                            payload = {
-                                                "type": "update", 
-                                                "make": record['Make'], 
-                                                "model": record['Model'], 
-                                                "column": col, 
-                                                "newValue": new_val
-                                            }
+                                            payload = {"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val}
                                             try:
                                                 requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
                                                 st.success("Submitted!")
-                                            except: 
-                                                st.error("Error submitting.")
+                                            except: st.error("Error submitting.")
                             
                             displayed.add(col)
                             found_any = True
-                    if not found_any: 
-                        st.info("No specific data found for this category.")
-
-            other = [c for c in record.index if c not in displayed and is_valid(record[c]) and "operator" not in c.lower()]
-            if other:
-                with st.expander("🔍 ADDITIONAL SPECS"):
-                    for col in other:
-                        st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
-                        st.write(str(record[col]))
             
             if st.button("⬅ Back to Search"):
                 st.session_state.show_results = False
