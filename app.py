@@ -140,7 +140,7 @@ def main():
             
             st.divider()
 
-            # Updated sections with your new specific column names
+            # Categorized Expanders with robust matching
             sections = {
                 "🪫 BATTERY DETAILS": ["battery", "hybrid", "voltage", "12v", "battery comments"],
                 "🏋️ JACKING POINTS": ["jack", "jacking", "lift", "point", "torque", "jacking comments"],
@@ -149,8 +149,15 @@ def main():
 
             displayed_cols = {make_c, model_c, year_c, fuel_c, drive_c, 'Clean_Model', 'Model', 'Make'}
 
+            # Improved matching loop
             for label, keywords in sections.items():
-                matched_cols = [c for c in record.index if any(kw in c.lower() for kw in keywords) and c not in displayed_cols]
+                matched_cols = []
+                for c in record.index:
+                    if c not in displayed_cols:
+                        clean_col = c.strip().lower()
+                        if any(kw in clean_col for kw in keywords):
+                            matched_cols.append(c)
+                
                 with st.expander(label):
                     if matched_cols:
                         for col in matched_cols:
