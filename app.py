@@ -43,29 +43,52 @@ def is_valid(val):
     str_val = str(val).strip().lower()
     return str_val != 'nan' and str_val != ''
 
-# --- SIDEBAR MENU ---
+# --- SIDEBAR MENU (TESTING MODE) ---
 def show_sidebar_menu():
     try:
         side_df = load_sidebar_data()
-        # Drop rows where 'Category' or 'Link' are totally blank
-        side_df = side_df.dropna(subset=['Category', 'Link'])
         
         with st.sidebar:
             st.header("📚 Generic Resources")
             st.divider()
             
-            categories = side_df['Category'].unique()
+            if side_df.empty:
+                st.info("No data found in the Sidebar tab. Add rows to see them here.")
+                return
+
+            if not all(col in side_df.columns for col in ['Category', 'Sub-Category', 'Link']):
+                st.error("Your Sidebar tab must have columns named: Category, Sub-Category, Link")
+                return
+            
+            # Get valid categories (ignoring empty category cells)
+            categories = side_df['Category'].dropna().unique()
+
             for cat in categories:
-                st.subheader(f"🗂️ {cat}")
-                subset = side_df[side_df['Category'] == cat]
-                for _, row in subset.iterrows():
-                    link = str(row['Link']).strip()
-                    # Ensure the link actually starts with http to prevent crashes
-                    if link.startswith("http"):
-                        st.link_button(f"🔗 {row['Sub-Category']}", url=link, use_container_width=True)
-                st.write("") 
+                # Ensure the category name isn't just empty space
+                if is_valid(cat):
+                    st.subheader(f"🗂️ {cat}")
+                    subset = side_df[side_df['Category'] == cat]
+                    
+                    for _, row in subset.iterrows():
+                        sub_cat = str(row.get('Sub-Category', 'Resource')).strip()
+                        link = str(row.get('Link', '')).strip()
+                        
+                        # --- THE TESTING FIX ---
+                        # If the link is totally blank or just empty space, inject a dummy link
+                        if not is_valid(link) or link == 'nan':
+                            link = "https://example.com"
+                        # If they typed something but forgot "http", add it
+                        elif not link.startswith("http"):
+                            link = "https://" + link
+                            
+                        # Show the button, even if it's using the dummy link!
+                        if is_valid(sub_cat) and sub_cat != 'nan':
+                            st.link_button(f"🔗 {sub_cat}", url=link, use_container_width=True)
+                    
+                    st.write("") # Add a little space between categories
+
     except Exception as e:
-        st.sidebar.warning(f"Sidebar data issue. Check your sheet links. Error: {e}")
+        st.sidebar.error(f"Sidebar error: {e}")
 
 # --- MAIN APP ---
 def main():
@@ -143,18 +166,13 @@ def main():
                             st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
                             
                             if is_valid(val):
-                                # Check if it is a photo column or image link
                                 if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
-                                    
-                                    # --- UPGRADED GOOGLE DRIVE DIRECT LINK CONVERTER ---
                                     img_src = val
                                     if "drive.google.com" in val or "docs.google.com" in val:
-                                        # Catch /file/d/ OR ?id= formats
                                         match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', val) or re.search(r'id=([a-zA-Z0-9_-]+)', val)
                                         if match:
                                             file_id = match.group(1)
                                             img_src = f"https://drive.google.com/thumbnail?id={file_id}&sz=w400"
-                                    # ---------------------------------------------------
 
                                     st.markdown(f"""
                                         <a href="{val}" target="_blank">
