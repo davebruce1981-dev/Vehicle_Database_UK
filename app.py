@@ -85,7 +85,7 @@ def main():
                 
                 if st.form_submit_button("Send Request"):
                     # IMPORTANT: Paste your new Google Apps Script Web App URL exactly inside these quotes!
-                    url = "https://script.google.com/macros/s/YOUR_NEW_WEB_APP_URL_HERE/exec"
+                    url = "https://script.google.com/macros/s/AKfycbxyz1234567890/exec"
                     try:
                         payload = {"make": make, "model": model, "year": year, "details": details}
                         response = requests.post(url, json=payload, timeout=10)
