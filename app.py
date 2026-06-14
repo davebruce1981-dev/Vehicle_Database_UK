@@ -47,6 +47,9 @@ def is_valid(val):
 def show_sidebar_menu():
     try:
         side_df = load_sidebar_data()
+        # Drop rows where 'Category' or 'Link' are totally blank
+        side_df = side_df.dropna(subset=['Category', 'Link'])
+        
         with st.sidebar:
             st.header("📚 Generic Resources")
             st.divider()
@@ -56,18 +59,19 @@ def show_sidebar_menu():
                 st.subheader(f"🗂️ {cat}")
                 subset = side_df[side_df['Category'] == cat]
                 for _, row in subset.iterrows():
-                    st.link_button(f"🔗 {row['Sub-Category']}", url=row['Link'], use_container_width=True)
+                    link = str(row['Link']).strip()
+                    # Ensure the link actually starts with http to prevent crashes
+                    if link.startswith("http"):
+                        st.link_button(f"🔗 {row['Sub-Category']}", url=link, use_container_width=True)
                 st.write("") 
     except Exception as e:
-        st.sidebar.warning("Sidebar data could not be loaded. Please ensure the 'Sidebar' tab exists in your Google Sheet.")
+        st.sidebar.warning(f"Sidebar data issue. Check your sheet links. Error: {e}")
 
 # --- MAIN APP ---
 def main():
-    # Show the sidebar menu first
     show_sidebar_menu()
 
     col1, col2, col3 = st.columns([1, 4, 1]) 
-    # Ensure you have your logo file in the same folder as app.py
     try:
         st.image("Recoveryspecs logo.jpeg", use_container_width=True)
     except:
@@ -142,20 +146,22 @@ def main():
                                 # Check if it is a photo column or image link
                                 if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
                                     
-                                    # --- GOOGLE DRIVE DIRECT LINK CONVERTER (THUMBNAIL API) ---
+                                    # --- UPGRADED GOOGLE DRIVE DIRECT LINK CONVERTER ---
                                     img_src = val
-                                    if "drive.google.com/file/d/" in val:
-                                        match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', val)
+                                    if "drive.google.com" in val or "docs.google.com" in val:
+                                        # Catch /file/d/ OR ?id= formats
+                                        match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', val) or re.search(r'id=([a-zA-Z0-9_-]+)', val)
                                         if match:
                                             file_id = match.group(1)
                                             img_src = f"https://drive.google.com/thumbnail?id={file_id}&sz=w400"
-                                    # ------------------------------------------
+                                    # ---------------------------------------------------
 
                                     st.markdown(f"""
                                         <a href="{val}" target="_blank">
                                             <img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
                                         </a>
                                     """, unsafe_allow_html=True)
+                                    
                                 elif "http" in val.lower():
                                     st.link_button(f"🌐 View {col}", url=val)
                                 else:
