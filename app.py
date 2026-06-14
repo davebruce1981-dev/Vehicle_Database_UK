@@ -79,7 +79,6 @@ def main():
         
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
         
-        # Logic fix for UnboundLocalError
         if not selected_model:
             filtered_by_model = filtered_by_make
         else:
@@ -141,11 +140,11 @@ def main():
             
             st.divider()
 
-            # Categorized Expanders
+            # Updated sections with your new specific column names
             sections = {
-                "🪫 BATTERY DETAILS": ["battery", "hybrid", "voltage", "12v"],
-                "🏋️ JACKING POINTS": ["jack", "jacking", "lift", "point", "torque"],
-                "🔌 OBD LOCATION": ["obd", "odb", "diagnostic", "port"]
+                "🪫 BATTERY DETAILS": ["battery", "hybrid", "voltage", "12v", "battery comments"],
+                "🏋️ JACKING POINTS": ["jack", "jacking", "lift", "point", "torque", "jacking comments"],
+                "🔌 OBD LOCATION": ["obd", "odb", "diagnostic", "port", "odb comments"]
             }
 
             displayed_cols = {make_c, model_c, year_c, fuel_c, drive_c, 'Clean_Model', 'Model', 'Make'}
