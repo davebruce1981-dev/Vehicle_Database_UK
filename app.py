@@ -49,7 +49,7 @@ def main():
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
-        filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
+        filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_model['Clean_Model'] == selected_model]
         
         selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
 
@@ -118,12 +118,17 @@ def main():
                             displayed.add(col)
                             found_any = True
             
-            # --- RENAME: OTHER SPECIFICATIONS ---
+            # --- OTHER SPECIFICATIONS ---
             with st.expander("⚙️ OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
                     if col not in displayed and is_valid(record[col]):
-                        st.write(f"**{col}:** {record[col]}")
+                        val = str(record[col])
+                        # Check if it looks like a link
+                        if "link" in col.lower() or "yuasa" in col.lower() or "dvla" in col.lower():
+                            st.link_button(f"🌐 {col}", url=val, use_container_width=True)
+                        else:
+                            st.write(f"**{col}:** {val}")
                         found_other = True
                 if not found_other:
                     st.write("No additional information available.")
