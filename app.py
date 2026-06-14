@@ -45,7 +45,6 @@ def main():
     if not st.session_state.show_results:
         st.subheader("Search Specs")
 
-        # --- SEARCH LOGIC ---
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
@@ -61,7 +60,6 @@ def main():
             
         st.divider()
 
-        # --- REPORT MISSING VEHICLE ---
         with st.expander("➕ Report Missing Vehicle"):
             with st.form("missing_vehicle_form", clear_on_submit=True):
                 n_make = st.text_input("Make")
@@ -70,28 +68,19 @@ def main():
                 n_details = st.text_input("Additional Details")
                 
                 if st.form_submit_button("Submit Request"):
-                    payload = {
-                        "type": "new_request", 
-                        "make": n_make, 
-                        "model": n_model, 
-                        "year": n_year, 
-                        "details": n_details
-                    }
+                    payload = {"type": "new_request", "make": n_make, "model": n_model, "year": n_year, "details": n_details}
                     try:
                         requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
                         st.success("Request submitted successfully!")
-                    except: 
-                        st.error("Error submitting.")
+                    except: st.error("Error submitting.")
 
     else:
         results = st.session_state.results
         if len(results) == 1:
             record = results.iloc[0]
-            # FIXED: Added Year Range to header
             st.subheader(f"{record.get('Make', '')} {record.get('Model', '')} | {record.get('Year Range', '')}")
             st.divider()
 
-            # --- GENERAL INFO ---
             st.subheader("General Details")
             for col in ['Fuel Type', 'Drivetrain', 'Engine']:
                 if col in record.index and is_valid(record[col]):
@@ -108,7 +97,6 @@ def main():
                         if any(k in col.lower() for k in keywords) and col not in displayed:
                             val = str(record[col])
                             st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
-                            
                             if is_valid(val):
                                 st.write(val)
                             else:
@@ -129,6 +117,16 @@ def main():
                                             st.success("Submitted!")
                             displayed.add(col)
                             found_any = True
+            
+            # --- RENAME: OTHER SPECIFICATIONS ---
+            with st.expander("⚙️ OTHER SPECIFICATIONS"):
+                found_other = False
+                for col in record.index:
+                    if col not in displayed and is_valid(record[col]):
+                        st.write(f"**{col}:** {record[col]}")
+                        found_other = True
+                if not found_other:
+                    st.write("No additional information available.")
             
             if st.button("⬅ Back to Search"):
                 st.session_state.show_results = False
