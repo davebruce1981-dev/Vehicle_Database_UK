@@ -54,15 +54,18 @@ def is_valid(val):
 
 def main():
     col1, col2, col3 = st.columns([1, 4, 1]) 
-    with col2: st.image("Recoveryspecs logo.jpeg", use_container_width=True)
+    with col2: 
+        st.image("Recoveryspecs logo.jpeg", use_container_width=True)
 
     df = load_data()
     if 'Model' in df.columns:
         df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
     
-    if 'show_results' not in st.session_state: st.session_state.show_results = False
+    if 'show_results' not in st.session_state: 
+        st.session_state.show_results = False
 
     if not st.session_state.show_results:
+        # --- SEARCH UI ---
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
@@ -76,14 +79,13 @@ def main():
             st.session_state.show_results = True
             st.rerun()
     else:
+        # --- RESULTS UI ---
         results = st.session_state.results
         if len(results) == 1:
             record = results.iloc[0]
             st.subheader(f"{record.get('Make', '')} {record.get('Model', '')}")
             
             # Use explicit column access
-            make = record.get('Make', 'N/A')
-            model = record.get('Model', 'N/A')
             year = record.get('Year Range', 'N/A')
             fuel = record.get('Fuel Type', 'N/A')
             drive = record.get('Drivetrain', 'N/A')
@@ -98,21 +100,23 @@ def main():
                 "🔌 OBD LOCATION": ["obd", "odb"]
             }
 
-            # Columns already displayed at the top
             displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain'}
             
             for label, keywords in sections.items():
                 with st.expander(label):
                     found_any = False
                     for col in record.index:
+                        # Check keyword match and cell validity
                         if any(k in col.lower() for k in keywords) and is_valid(record[col]):
                             st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
                             st.write(str(record[col]))
                             displayed.add(col)
                             found_any = True
-                    if not found_any: st.info("No details available.")
+                    if not found_any: 
+                        st.info("No details available.")
 
-            other = [c for c in record.index if c not in displayed and is_valid(record[c])]
+            # Filter out Operator Comments from additional specs
+            other = [c for c in record.index if c not in displayed and is_valid(record[c]) and "operator" not in c.lower()]
             if other:
                 with st.expander("🔍 ADDITIONAL SPECS"):
                     for col in other:
