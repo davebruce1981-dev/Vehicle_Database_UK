@@ -18,7 +18,7 @@ st.markdown("""
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     </style>
-""", unsafe_allow_html=True)
+""", unsafe_approval_html=True)
 
 @st.cache_data(ttl=600)
 def load_data():
@@ -85,12 +85,19 @@ def main():
                             else:
                                 st.write("*No data yet*")
                                 
-                                # --- PHOTO LOGIC ---
+                                # --- PHOTO LOGIC (Choice: Upload or Camera) ---
                                 if "photo" in col.lower():
-                                    img_file = st.camera_input(f"Take photo for {col}")
+                                    action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{col}")
+                                    img_file = None
+                                    
+                                    if action == "Upload Photo":
+                                        img_file = st.file_uploader(f"Choose file for {col}", type=['jpg', 'png', 'jpeg'], key=f"uploader_{col}")
+                                    else:
+                                        img_file = st.camera_input(f"Camera for {col}", key=f"camera_{col}")
+                                    
                                     if img_file is not None:
-                                        if st.button("Upload Photo"):
-                                            # Convert image to base64 for transmission
+                                        if st.button(f"Submit Photo for {col}", key=f"btn_{col}"):
+                                            # Convert image to base64
                                             bytes_data = img_file.getvalue()
                                             base64_str = base64.b64encode(bytes_data).decode('utf-8')
                                             
