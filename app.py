@@ -45,6 +45,13 @@ def load_data():
     df.columns = df.columns.str.strip()
     return df
 
+def is_valid(val):
+    """Safely checks if a value is not null, not 'nan', and not empty."""
+    if pd.isna(val):
+        return False
+    str_val = str(val).strip().lower()
+    return str_val != 'nan' and str_val != ''
+
 def main():
     col1, col2, col3 = st.columns([1, 4, 1]) 
     with col2: st.image("Recoveryspecs logo.jpeg", use_container_width=True)
@@ -56,7 +63,6 @@ def main():
     if 'show_results' not in st.session_state: st.session_state.show_results = False
 
     if not st.session_state.show_results:
-        # --- SEARCH UI ---
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
@@ -70,29 +76,31 @@ def main():
             st.session_state.show_results = True
             st.rerun()
     else:
-        # --- RESULTS UI ---
         results = st.session_state.results
         if len(results) == 1:
             record = results.iloc[0]
             st.subheader(f"{record.get('Make', '')} {record.get('Model', '')}")
             
-            # Helper to ignore empty or 'nan' data
-            def is_valid(val):
-                return pd.notna(val) and str(val).lower() != 'nan' and str(val).strip() != ''
+            # Use explicit column access
+            make = record.get('Make', 'N/A')
+            model = record.get('Model', 'N/A')
+            year = record.get('Year Range', 'N/A')
+            fuel = record.get('Fuel Type', 'N/A')
+            drive = record.get('Drivetrain', 'N/A')
 
-            # Define core columns to keep at the top
-            core_cols = ['Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain']
-            
-            # Grouping Logic
+            st.markdown(f"**YEAR:** {year} | **FUEL:** {fuel}")
+            st.markdown(f"**DRIVE:** {drive}")
+            st.divider()
+
             sections = {
                 "🪫 BATTERY DETAILS": ["battery"],
                 "🏋️ JACKING POINTS": ["jack", "torque"],
-                "🔌 OBD LOCATION": ["odb", "obd"]
+                "🔌 OBD LOCATION": ["obd", "odb"]
             }
 
-            displayed = set(core_cols)
+            # Columns already displayed at the top
+            displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain'}
             
-            # Render Expanders
             for label, keywords in sections.items():
                 with st.expander(label):
                     found_any = False
@@ -104,7 +112,6 @@ def main():
                             found_any = True
                     if not found_any: st.info("No details available.")
 
-            # Catch-all
             other = [c for c in record.index if c not in displayed and is_valid(record[c])]
             if other:
                 with st.expander("🔍 ADDITIONAL SPECS"):
@@ -116,7 +123,6 @@ def main():
                 st.session_state.show_results = False
                 st.rerun()
         else:
-            # List view
             for idx, row in results.iterrows():
                 if st.button(f"{row['Make']} | {row['Model']} | {row['Year Range']}", key=f"list_{idx}", use_container_width=True):
                     st.session_state.results = results.loc[[idx]]
