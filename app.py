@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import requests
 import base64
+import time
 
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="Recovery Specs", layout="centered")
@@ -61,9 +62,9 @@ def main():
             
         st.divider()
 
-        # --- REPORT MISSING VEHICLE (Moved Below Search) ---
+        # --- REPORT MISSING VEHICLE (With Auto-Clear) ---
         with st.expander("➕ Report Missing Vehicle"):
-            with st.form("missing_vehicle_form"):
+            with st.form("missing_vehicle_form", clear_on_submit=True): # clear_on_submit=True handles this natively
                 n_make = st.text_input("Make")
                 n_model = st.text_input("Model")
                 n_year = st.text_input("Year Range")
@@ -79,7 +80,7 @@ def main():
                     }
                     try:
                         requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
-                        st.success("Request submitted to 'Requests' tab!")
+                        st.success("Request submitted successfully!")
                     except: 
                         st.error("Error submitting.")
 
