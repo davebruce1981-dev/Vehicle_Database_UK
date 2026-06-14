@@ -38,7 +38,6 @@ def is_valid(val):
 def main():
     col1, col2, col3 = st.columns([1, 4, 1]) 
     # Ensure you have your logo file in the same folder as app.py
-    # If you don't have the logo file, comment out the line below with a #
     try:
         st.image("Recoveryspecs logo.jpeg", use_container_width=True)
     except:
@@ -108,8 +107,21 @@ def main():
                         if any(k in col.lower() for k in keywords) and col not in displayed:
                             val = str(record[col])
                             st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
+                            
                             if is_valid(val):
-                                st.write(val)
+                                # Check if it is a photo column or image link
+                                if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
+                                    st.markdown(f"""
+                                        <a href="{val}" target="_blank">
+                                            <img src="{val}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
+                                        </a>
+                                    """, unsafe_allow_html=True)
+                                elif "http" in val.lower():
+                                    # If it's a link but not an image, show a button
+                                    st.link_button(f"🌐 View {col}", url=val)
+                                else:
+                                    # Standard text
+                                    st.write(val)
                             else:
                                 st.write("*No data yet*")
                                 if "photo" in col.lower():
@@ -133,6 +145,7 @@ def main():
                 for col in record.index:
                     if col not in displayed and is_valid(record[col]):
                         val = str(record[col])
+                        # Reverted this back to standard link buttons
                         if "http" in val.lower() or "link" in col.lower() or "yuasa" in col.lower() or "dvla" in col.lower():
                             st.link_button(f"🌐 {col}", url=val, use_container_width=True)
                         else:
