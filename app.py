@@ -3,7 +3,6 @@ import pandas as pd
 import re
 import requests
 import base64
-import time
 
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="Recovery Specs", layout="centered")
@@ -62,9 +61,9 @@ def main():
             
         st.divider()
 
-        # --- REPORT MISSING VEHICLE (With Auto-Clear) ---
+        # --- REPORT MISSING VEHICLE ---
         with st.expander("➕ Report Missing Vehicle"):
-            with st.form("missing_vehicle_form", clear_on_submit=True): # clear_on_submit=True handles this natively
+            with st.form("missing_vehicle_form", clear_on_submit=True):
                 n_make = st.text_input("Make")
                 n_model = st.text_input("Model")
                 n_year = st.text_input("Year Range")
@@ -88,7 +87,8 @@ def main():
         results = st.session_state.results
         if len(results) == 1:
             record = results.iloc[0]
-            st.subheader(f"{record.get('Make', '')} {record.get('Model', '')}")
+            # FIXED: Added Year Range to header
+            st.subheader(f"{record.get('Make', '')} {record.get('Model', '')} | {record.get('Year Range', '')}")
             st.divider()
 
             # --- GENERAL INFO ---
