@@ -29,7 +29,7 @@ st.markdown("""
         background-color: #333333 !important; 
         color: #ffffff !important; 
         border: 2px solid #555555 !important;
-        font-weight: bold;
+        font-weight: bold; 
         width: 100%;
     }
     
@@ -106,21 +106,27 @@ def main():
                                 st.write(val)
                             else:
                                 st.write("*No data yet*")
-                                with st.form(f"form_{col}_{record.name}"):
-                                    new_val = st.text_input(f"Add info for {col}")
-                                    if st.form_submit_button("Submit for Approval"):
-                                        payload = {
-                                            "type": "update", 
-                                            "make": record['Make'], 
-                                            "model": record['Model'], 
-                                            "column": col, 
-                                            "newValue": new_val
-                                        }
-                                        try:
-                                            requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
-                                            st.success("Submitted!")
-                                        except: 
-                                            st.error("Error submitting.")
+                                
+                                # Logic: Check if it's a photo field or a text field
+                                if "photo" in col.lower():
+                                    st.link_button("📸 Upload/Take Photo (Google Form)", "YOUR_GOOGLE_FORM_URL_HERE")
+                                else:
+                                    # Text input form for non-photo data
+                                    with st.form(f"form_{col}_{record.name}"):
+                                        new_val = st.text_input(f"Add info for {col}")
+                                        if st.form_submit_button("Submit for Approval"):
+                                            payload = {
+                                                "type": "update", 
+                                                "make": record['Make'], 
+                                                "model": record['Model'], 
+                                                "column": col, 
+                                                "newValue": new_val
+                                            }
+                                            try:
+                                                requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
+                                                st.success("Submitted!")
+                                            except: 
+                                                st.error("Error submitting.")
                             
                             displayed.add(col)
                             found_any = True
