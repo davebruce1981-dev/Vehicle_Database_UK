@@ -1,7 +1,3 @@
-Here is the complete, final code for your app.py file. It includes the updated Google Sheets link pointing to the Vehicle_Library tab, the correct filename for your new logo, and the form setup.
-
-The Complete app.py Code
-Python
 import streamlit as st
 import pandas as pd
 import re
