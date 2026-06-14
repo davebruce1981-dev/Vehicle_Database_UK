@@ -112,13 +112,14 @@ def main():
                                 # Check if it is a photo column or image link
                                 if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
                                     
-                                    # --- GOOGLE DRIVE DIRECT LINK CONVERTER ---
+                                    # --- GOOGLE DRIVE DIRECT LINK CONVERTER (THUMBNAIL API) ---
                                     img_src = val
                                     if "drive.google.com/file/d/" in val:
                                         match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', val)
                                         if match:
                                             file_id = match.group(1)
-                                            img_src = f"https://drive.google.com/uc?export=view&id={file_id}"
+                                            # Use Google's thumbnail API for reliable embedding
+                                            img_src = f"https://drive.google.com/thumbnail?id={file_id}&sz=w400"
                                     # ------------------------------------------
 
                                     st.markdown(f"""
