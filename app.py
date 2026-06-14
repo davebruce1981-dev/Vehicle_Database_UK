@@ -45,9 +45,7 @@ def main():
     if not st.session_state.show_results:
         st.subheader("Search Specs")
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
-        
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
-        
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
         
         if not selected_model:
@@ -68,13 +66,21 @@ def main():
             st.subheader(f"{record.get('Make', '')} {record.get('Model', '')}")
             st.divider()
 
+            # --- GENERAL INFO SECTION ---
+            st.subheader("General Details")
+            cols_to_show = ['Fuel Type', 'Drivetrain', 'Engine']
+            for col in cols_to_show:
+                if col in record.index and is_valid(record[col]):
+                    st.write(f"**{col}:** {record[col]}")
+            st.divider()
+
             sections = {
                 "🪫 BATTERY DETAILS": ["battery"],
                 "🏋️ JACKING POINTS": ["jack", "torque"],
                 "🔌 OBD LOCATION": ["obd", "odb"]
             }
 
-            displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Clean_Model'}
+            displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model'}
             
             for label, keywords in sections.items():
                 with st.expander(label):
@@ -120,7 +126,6 @@ def main():
                             
                             displayed.add(col)
                             found_any = True
-                    if not found_any: st.info("No specific data found for this category.")
             
             if st.button("⬅ Back to Search"):
                 st.session_state.show_results = False
