@@ -1,3 +1,6 @@
+Here is the complete, copyable app.py code.
+
+Python
 import streamlit as st
 import pandas as pd
 import re
@@ -10,14 +13,29 @@ st.markdown("""
     <style>
     .stApp { background-color: #000000 !important; }
     h1, h2, h3, h4, p, label { color: #ffffff !important; }
-    div[data-testid="stVerticalBlock"] div.stButton > button, div[data-testid="stFormSubmitButton"] button { 
-        background-color: #f6782a !important; color: white !important; width: 100%; font-weight: bold; border: none !important;
+    
+    div[data-testid="stVerticalBlock"] div.stButton > button, 
+    div[data-testid="stFormSubmitButton"] button { 
+        background-color: #f6782a !important; 
+        color: white !important; 
+        width: 100%; 
+        font-weight: bold; 
+        border: none !important;
     }
-    div.stButton > button[key^="list_"] { background-color: #f6782a !important; color: white !important; }
+    
+    div.stButton > button[key^="list_"] { 
+        background-color: #f6782a !important; 
+        color: white !important; 
+    }
+
     div.back-btn-container div[data-testid="stButton"] button {
-        background-color: #333333 !important; color: #ffffff !important; border: 2px solid #555555 !important;
-        font-weight: bold; width: 100%;
+        background-color: #333333 !important; 
+        color: #ffffff !important; 
+        border: 2px solid #555555 !important;
+        font-weight: bold; 
+        width: 100%;
     }
+    
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     </style>
@@ -49,8 +67,10 @@ def main():
         st.subheader("Search Specs")
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
+        
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
         filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
+        
         selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
@@ -81,21 +101,34 @@ def main():
                     for col in record.index:
                         if any(k in col.lower() for k in keywords) and col not in displayed:
                             val = str(record[col])
-                            st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
-                            st.write(val if is_valid(val) else "*No data yet*")
+                            has_data = is_valid(val)
                             
-                            with st.form(f"form_{col}_{record.name}"):
-                                new_val = st.text_input(f"Submit new info for {col}")
-                                if st.form_submit_button("Submit for Approval"):
-                                    payload = {"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val}
-                                    try:
-                                        requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
-                                        st.success("Submitted!")
-                                    except: st.error("Error submitting.")
+                            st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
+                            
+                            if has_data:
+                                st.write(val)
+                            else:
+                                st.write("*No data yet*")
+                                with st.form(f"form_{col}_{record.name}"):
+                                    new_val = st.text_input(f"Add info for {col}")
+                                    if st.form_submit_button("Submit for Approval"):
+                                        payload = {
+                                            "type": "update", 
+                                            "make": record['Make'], 
+                                            "model": record['Model'], 
+                                            "column": col, 
+                                            "newValue": new_val
+                                        }
+                                        try:
+                                            requests.post("https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec", json=payload)
+                                            st.success("Submitted!")
+                                        except: 
+                                            st.error("Error submitting.")
                             
                             displayed.add(col)
                             found_any = True
-                    if not found_any: st.info("No details available.")
+                    if not found_any: 
+                        st.info("No specific data found for this category.")
 
             other = [c for c in record.index if c not in displayed and is_valid(record[c]) and "operator" not in c.lower()]
             if other:
