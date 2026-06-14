@@ -84,8 +84,8 @@ def main():
                 details = st.text_area("Details")
                 
                 if st.form_submit_button("Send Request"):
-                    # IMPORTANT: Paste your new Google Apps Script Web App URL exactly inside these quotes!
-                    url = "https://script.google.com/macros/s/AKfycbxyz1234567890/exec"
+                    # Your brand-new, correctly deployed URL is here:
+                    url = "https://script.google.com/macros/s/AKfycbw1BzmjWIhqvgwEKbPzJdSz6JgpkDi11KnAM-IGcP8o495lnGWKFK6THoEigf8nXpjc/exec"
                     try:
                         payload = {"make": make, "model": model, "year": year, "details": details}
                         response = requests.post(url, json=payload, timeout=10)
