@@ -226,7 +226,7 @@ def main():
                                             st.success("Submitted!")
                             displayed.add(col)
             
-            with st.expander("⚙️ OTHER SPECIFICATIONS"):
+            with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
                     if col not in displayed and is_valid(record[col]):
