@@ -171,7 +171,15 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            sections = {"🪫 BATTERY DETAILS": ["battery"], "🏋️ JACKING POINTS": ["jack", "torque"], "🔌 OBD LOCATION": ["obd", "odb"]}
+            # --- UPDATED SECTIONS DICTIONARY HERE ---
+            sections = {
+                "🪫 BATTERY DETAILS": ["battery"], 
+                "🏋️ JACKING POINTS": ["jack", "torque"], 
+                "🔌 OBD LOCATION": ["obd", "odb"],
+                "🅿️ HANDBRAKE RELEASE": ["electric handbrake"],
+                "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear"]
+            }
+            
             displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model'}
             
             for label, keywords in sections.items():
