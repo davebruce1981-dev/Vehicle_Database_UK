@@ -1,13 +1,3 @@
-That InvalidIndexError happens because of a sneaky side-effect from the loose column matching we introduced (if 'make' in c_low).
-
-When Google Sheets exports your data, if there are any blank columns or columns with similar names, Pandas automatically reads them as things like Make and Make.1 to keep them unique. Because our previous script used a broad "contains" check, it accidentally renamed both Make and Make.1 to exactly Make.
-
-When pd.concat() tries to stack your sheets together, it sees two columns with the exact same name in a single sheet, panics because it doesn't know which one is which, and throws that InvalidIndexError.
-
-To fix this, I have reverted the column mapping back to a strict match list and added an explicit deduplication guardrail that drops any accidental duplicate columns before merging.
-
-The Fixed Code
-Python
 import streamlit as st
 import pandas as pd
 import re
