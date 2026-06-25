@@ -6,8 +6,6 @@ import base64
 
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="Recovery Specs", layout="centered")
-
-# CENTRALIZED URL
 GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcjYzl5kmbGMfy90KXxO8b18E-eWYK-Xc9EAOxwROFtDoOQHePYduTXMEfiTarb7Jh/exec"
 
 st.markdown("""
@@ -20,284 +18,87 @@ st.markdown("""
     }
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
-    
-    /* --- MAGIC HAMBURGER CSS --- */
-    /* Hide the default Streamlit arrows */
-    [data-testid="collapsedControl"] svg {
-        display: none !important;
-    }
-    /* Replace with Hamburger icon */
+    [data-testid="collapsedControl"] svg { display: none !important; }
     [data-testid="collapsedControl"]::after {
-        content: "☰";
-        font-size: 26px;
-        color: #ffffff;
-        font-weight: bold;
-        padding-left: 5px;
+        content: "☰"; font-size: 26px; color: #ffffff; font-weight: bold; padding-left: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- SMART DATA FETCHING FUNCTIONS ---
-@st.cache_data(ttl=10)
-def load_data():
-    url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
-    # Load raw data without assuming row 1 is the header (fixes shifts caused by freezing/filtering)
-    df = pd.read_csv(url, header=None)
-    
-    # Scan the first 15 rows to locate where the actual data table starts
-    header_idx = 0
-    for i, row in df.head(15).iterrows():
-        if row.astype(str).str.strip().str.lower().eq('make').any():
-            header_idx = i
-            break
-            
-    # Clean up column variations and enforce correct capitalization
-    raw_cols = df.iloc[header_idx].astype(str).str.strip()
-    clean_cols = []
-    for c in raw_cols:
-        cl = c.lower()
-        if cl == 'make': clean_cols.append('Make')
-        elif cl == 'model': clean_cols.append('Model')
-        elif cl == 'year range': clean_cols.append('Year Range')
-        elif cl == 'fuel type': clean_cols.append('Fuel Type')
-        elif cl == 'drivetrain': clean_cols.append('Drivetrain')
-        elif cl == 'engine': clean_cols.append('Engine')
-        else: clean_cols.append(c)
-        
-    df.columns = clean_cols
-    df = df.iloc[header_idx + 1:].reset_index(drop=True)
-    return df
-
+# --- DATA FETCHING ---
 @st.cache_data(ttl=600)
-def load_sidebar_data():
-    url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Sidebar"
-    df = pd.read_csv(url, header=None)
+def load_all_data():
+    # Define your sheets here
+    sheets = ["Vehicle_Library", "Motorcycles", "Vans", "HGV"]
+    sheet_labels = {
+        "Vehicle_Library": "Car / Light Commercial",
+        "Motorcycles": "Motorcycle",
+        "Vans": "Van",
+        "HGV": "HGV"
+    }
     
-    header_idx = 0
-    for i, row in df.head(15).iterrows():
-        if row.astype(str).str.strip().str.lower().eq('category').any():
-            header_idx = i
-            break
+    df_list = []
+    base_url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet="
+    
+    for sheet in sheets:
+        try:
+            df = pd.read_csv(f"{base_url}{sheet}")
+            df.columns = df.columns.str.strip()
+            df['Vehicle Category'] = sheet_labels.get(sheet, sheet)
+            df_list.append(df)
+        except Exception as e:
+            st.error(f"Error loading '{sheet}': {e}")
             
-    raw_cols = df.iloc[header_idx].astype(str).str.strip()
-    clean_cols = []
-    for c in raw_cols:
-        cl = c.lower()
-        if cl == 'category': clean_cols.append('Category')
-        elif cl == 'sub-category': clean_cols.append('Sub-Category')
-        elif cl == 'link': clean_cols.append('Link')
-        else: clean_cols.append(c)
-        
-    df.columns = clean_cols
-    df = df.iloc[header_idx + 1:].reset_index(drop=True)
-    return df
+    return pd.concat(df_list, ignore_index=True) if df_list else pd.DataFrame()
 
 def is_valid(val):
     if pd.isna(val): return False
     str_val = str(val).strip().lower()
     return str_val != 'nan' and str_val != ''
 
-# --- SIDEBAR MENU ---
-def show_sidebar_menu():
-    try:
-        side_df = load_sidebar_data()
-        
-        with st.sidebar:
-            st.header("📚 Generic Resources")
-            st.divider()
-            
-            if side_df.empty:
-                st.info("No data found in the Sidebar tab. Add rows to see them here.")
-                return
-
-            if not all(col in side_df.columns for col in ['Category', 'Sub-Category', 'Link']):
-                st.error("Your Sidebar tab must have columns named: Category, Sub-Category, Link")
-                return
-            
-            categories = side_df['Category'].dropna().unique()
-
-            for cat in categories:
-                if is_valid(cat):
-                    st.subheader(f"🗂️ {cat}")
-                    subset = side_df[side_df['Category'] == cat]
-                    
-                    for _, row in subset.iterrows():
-                        sub_cat = str(row.get('Sub-Category', 'Resource')).strip()
-                        link = str(row.get('Link', '')).strip()
-                        
-                        if not is_valid(link) or link == 'nan':
-                            link = "https://example.com"
-                        elif not link.startswith("http"):
-                            link = "https://" + link
-                            
-                        if is_valid(sub_cat) and sub_cat != 'nan':
-                            st.link_button(f"🔗 {sub_cat}", url=link, use_container_width=True)
-                    
-                    st.write("") 
-
-    except Exception as e:
-        st.sidebar.error(f"Sidebar error: {e}")
-
-# --- MAIN APP ---
+# --- MAIN ---
 def main():
-    col1, col2, col3 = st.columns([1, 4, 1]) 
-    try:
-        st.image("Recoveryspecs logo.jpeg", use_container_width=True)
-    except:
-        pass
+    try: st.image("Recoveryspecs logo.jpeg", use_container_width=True)
+    except: pass
 
-    df = load_data()
+    df = load_all_data()
+    if df.empty:
+        st.error("No data found.")
+        return
 
-    # Dynamic Recovery Guardrail
-    if 'Make' not in df.columns:
-        st.error("### 🚨 Connection Error: Cannot find the Vehicle Data!")
-        st.write("Google is ignoring the tab name because of an invisible trailing space in your sheet tab.")
-        st.info("💡 **How to fix this instantly:** Go to your Google Sheet, click the small arrow next to your **Vehicle_Library** tab name, select **Rename**, and check if there is an accidental space at the very end of the text. Delete that space, save it, and refresh this app!")
-        return 
-
+    # Clean models for dropdown
     if 'Model' in df.columns:
         df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
-    
+
     if 'show_results' not in st.session_state: st.session_state.show_results = False
 
     if not st.session_state.show_results:
-        show_sidebar_menu()
-
         st.subheader("Search Specs")
-
-        selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
-        filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
+        make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
+        filtered = df if not make else df[df['Make'] == make]
         
-        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
+        model = st.selectbox("MODEL", options=[""] + sorted(filtered['Clean_Model'].unique().astype(str)))
+        filtered = filtered if not model else filtered[filtered['Clean_Model'] == model]
         
-        if not selected_model:
-            filtered_by_model = filtered_by_make
-        else:
-            filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
-        
-        selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
+        year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered['Year Range'].unique().astype(str)))
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
-            st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
+            st.session_state.results = filtered[filtered['Year Range'] == year] if year else filtered
             st.session_state.show_results = True
             st.rerun()
-            
-        st.divider()
-
-        with st.expander("➕ Report Missing Vehicle"):
-            with st.form("missing_vehicle_form", clear_on_submit=True):
-                n_make = st.text_input("Make")
-                n_model = st.text_input("Model")
-                n_year = st.text_input("Year Range")
-                n_details = st.text_input("Additional Details")
-                
-                if st.form_submit_button("Submit Request"):
-                    payload = {"type": "new_request", "make": n_make, "model": n_model, "year": n_year, "details": n_details}
-                    try:
-                        requests.post(GOOGLE_SCRIPT_URL, json=payload)
-                        st.success("Request submitted successfully!")
-                    except Exception as e: 
-                        st.error(f"Error submitting: {e}")
-
     else:
-        st.markdown("""
-            <style>
-            [data-testid="collapsedControl"] { display: none !important; }
-            </style>
-        """, unsafe_allow_html=True)
-
         results = st.session_state.results
         if len(results) == 1:
             record = results.iloc[0]
-            st.subheader(f"{record.get('Make', '')} {record.get('Model', '')} | {record.get('Year Range', '')}")
-            st.divider()
-
-            st.subheader("General Details")
-            for col in ['Fuel Type', 'Drivetrain', 'Engine']:
-                if col in record.index and is_valid(record[col]):
-                    st.write(f"**{col}:** {record[col]}")
-            st.divider()
-
-            sections = {
-                "🪫 BATTERY DETAILS": ["battery"], 
-                "🏋️ JACKING POINTS": ["jack", "torque"], 
-                "🔌 OBD LOCATION": ["obd", "odb"],
-                "🅿️ HANDBRAKE RELEASE": ["electric handbrake"],
-                "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear"]
-            }
-            
-            displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model'}
-            
-            for label, keywords in sections.items():
-                with st.expander(label):
-                    for col in record.index:
-                        if any(k in col.lower() for k in keywords) and col not in displayed:
-                            val = str(record[col])
-                            st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
-                            
-                            if is_valid(val):
-                                if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
-                                    img_src = val
-                                    if "drive.google.com" in val or "docs.google.com" in val:
-                                        match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', val) or re.search(r'id=([a-zA-Z0-9_-]+)', val)
-                                        if match:
-                                            file_id = match.group(1)
-                                            img_src = f"https://drive.google.com/thumbnail?id={file_id}&sz=w400"
-
-                                    st.markdown(f"""
-                                        <a href="{val}" target="_blank">
-                                            <img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
-                                        </a>
-                                    """, unsafe_allow_html=True)
-                                    
-                                elif "http" in val.lower():
-                                    st.link_button(f"🌐 View {col}", url=val)
-                                else:
-                                    st.write(val)
-                            else:
-                                st.write("*No data yet*")
-                                if "photo" in col.lower():
-                                    action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{col}")
-                                    img_file = st.file_uploader(f"Choose file", type=['jpg', 'png', 'jpeg'], key=f"uploader_{col}") if action == "Upload Photo" else st.camera_input(f"Camera", key=f"camera_{col}")
-                                    if img_file and st.button(f"Submit Photo for {col}", key=f"btn_{col}"):
-                                        bytes_data = img_file.getvalue()
-                                        base64_str = base64.b64encode(bytes_data).decode('utf-8')
-                                        try:
-                                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record['Make'], "model": record['Model'], "column": col, "image": base64_str})
-                                            st.success("Uploaded!")
-                                        except Exception as e:
-                                            st.error(f"Upload failed: {e}")
-                                else:
-                                    with st.form(f"form_{col}_{record.name}"):
-                                        new_val = st.text_input(f"Add info")
-                                        if st.form_submit_button("Submit"):
-                                            try:
-                                                requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val})
-                                                st.success("Submitted!")
-                                            except Exception as e:
-                                                st.error(f"Submission failed: {e}")
-                            displayed.add(col)
-            
-            with st.expander("🧩 OTHER SPECIFICATIONS"):
-                found_other = False
-                for col in record.index:
-                    if col not in displayed and is_valid(record[col]):
-                        val = str(record[col])
-                        if "http" in val.lower() or "link" in col.lower() or "yuasa" in col.lower() or "dvla" in col.lower():
-                            st.link_button(f"🌐 {col}", url=val, use_container_width=True)
-                        else:
-                            st.write(f"**{col}:** {val}")
-                        found_other = True
-                
-                if not found_other:
-                    st.write("No additional information available.")
+            st.subheader(f"{record.get('Make', '')} {record.get('Model', '')}")
+            st.write(f"**Category:** {record.get('Vehicle Category', 'N/A')}")
             
             if st.button("⬅ Back to Search"):
                 st.session_state.show_results = False
                 st.rerun()
         else:
             for idx, row in results.iterrows():
-                if st.button(f"{row['Make']} | {row['Model']} | {row['Year Range']}", key=f"list_{idx}", use_container_width=True):
+                if st.button(f"{row['Vehicle Category']} | {row['Make']} {row['Model']}", key=idx):
                     st.session_state.results = results.loc[[idx]]
                     st.rerun()
 
