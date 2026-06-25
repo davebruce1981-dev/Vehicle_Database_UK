@@ -53,7 +53,21 @@ def load_all_data():
         try:
             url = f"https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet={sheet}"
             df = pd.read_csv(url)
-            df.columns = df.columns.str.strip()
+            
+            # --- DEFENSIVE COLUMN ALIGNMENT ---
+            # Automatically maps case-mismatched headers from different sheets perfectly together
+            rename_dict = {}
+            for col in df.columns:
+                c_low = str(col).strip().lower()
+                if c_low == 'make':
+                    rename_dict[col] = 'Make'
+                elif c_low == 'model':
+                    rename_dict[col] = 'Model'
+                elif c_low in ['year range', 'yearrange', 'year']:
+                    rename_dict[col] = 'Year Range'
+                else:
+                    rename_dict[col] = str(col).strip()
+            df = df.rename(columns=rename_dict)
             
             label = sheet_labels.get(sheet, sheet)
             df['Vehicle Type'] = label
@@ -65,6 +79,12 @@ def load_all_data():
             
     if df_list:
         combined_df = pd.concat(df_list, ignore_index=True, sort=False)
+        
+        # Enforce that essential columns are guaranteed to exist globally
+        for core_col in ['Make', 'Model', 'Year Range']:
+            if core_col not in combined_df.columns:
+                combined_df[core_col] = ""
+                
         return combined_df, sheet_columns
     else:
         st.error("No data could be retrieved from any Google Sheet tab.")
@@ -134,16 +154,31 @@ def main():
         show_sidebar_menu()
         st.subheader("Search Specs")
 
-        if 'Model' in df.columns:
-            df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
+        if 'Make' in df.columns:
+            # Clean string normalization logic for dropdown preparation
+            make_options = sorted([str(m).strip() for m in df['Make'].dropna().unique() if str(m).strip().lower() != 'nan'])
+        else:
+            make_options = []
 
-        selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
+        selected_make = st.selectbox("MAKE", options=[""] + make_options)
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
 
-        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
+        if 'Model' in filtered_by_make.columns:
+            filtered_by_make['Clean_Model'] = filtered_by_make['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
+            model_options = sorted([str(m).strip() for m in filtered_by_make['Clean_Model'].dropna().unique() if str(m).strip().lower() != 'nan'])
+        else:
+            model_options = []
+
+        selected_model = st.selectbox("MODEL", options=[""] + model_options)
         filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         
-        selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
+        # --- FIXED LINE 146 TYPE-SAFETY ---
+        if 'Year Range' in filtered_by_model.columns:
+            year_options = sorted([str(y).strip() for y in filtered_by_model['Year Range'].dropna().unique() if str(y).strip().lower() != 'nan'])
+        else:
+            year_options = []
+
+        selected_year = st.selectbox("YEAR RANGE", options=[""] + year_options)
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
             st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
@@ -264,7 +299,7 @@ def main():
                 if not found_other:
                     st.write("No additional information available.")
 
-            # --- NEW GLOBAL ADDITIONAL INFORMATION SUBMISSION FORM ---
+            # --- GLOBAL ADDITIONAL INFORMATION SUBMISSION FORM ---
             with st.expander("➕ SUBMIT MISSING OR ADDITIONAL INFORMATION"):
                 with st.form("general_missing_info_form", clear_on_submit=True):
                     st.write("Know something else about this vehicle? Provide text notes, attach a photo, or submit both below.")
@@ -287,7 +322,6 @@ def main():
                             if attached_file:
                                 base64_img = base64.b64encode(attached_file.getvalue()).decode('utf-8')
                                 
-                            # Packages details dynamically tied to the active vehicle lookup
                             payload = {
                                 "type": "general_missing_info",
                                 "make": record.get('Make', ''),
