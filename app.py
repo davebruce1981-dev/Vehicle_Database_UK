@@ -21,9 +21,6 @@ st.markdown("""
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     
-    /* Horizontal radio buttons layout styling */
-    div[data-testid="stMarkdownContainer"] p { color: #ffffff !important; }
-    
     /* --- MAGIC HAMBURGER CSS --- */
     [data-testid="collapsedControl"] svg {
         display: none !important;
@@ -43,9 +40,9 @@ st.markdown("""
 def load_all_data():
     sheets = ["Vehicle_Library", "Motorcycles", "Vans", "HGV"]
     sheet_labels = {
-        "Vehicle_Library": "Cars / Light Commercial",
-        "Motorcycles": "Motorcycles",
-        "Vans": "Vans",
+        "Vehicle_Library": "Car / Light Commercial",
+        "Motorcycles": "Motorcycle",
+        "Vans": "Van",
         "HGV": "HGV"
     }
     
@@ -56,47 +53,21 @@ def load_all_data():
         try:
             url = f"https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet={sheet}"
             df = pd.read_csv(url)
-            
-            # Ensure all column headers are clean strings
-            df.columns = [str(c).strip() for c in df.columns]
-            
-            if df.empty or len(df.columns) < 2:
-                continue
-                
-            # --- STRICT COLUMN ALIGNMENT (Prevents clashing) ---
-            rename_dict = {}
-            for col in df.columns:
-                c_low = col.lower()
-                if c_low in ['make', 'manufacturer', 'brand', 'vehicle make']:
-                    rename_dict[col] = 'Make'
-                elif c_low in ['model', 'vehicle model']:
-                    rename_dict[col] = 'Model'
-                elif c_low in ['year range', 'yearrange', 'year']:
-                    rename_dict[col] = 'Year Range'
-            
-            df = df.rename(columns=rename_dict)
-            
-            # --- DEDUPLICATION GUARDRAIL (Fixes InvalidIndexError) ---
-            if df.columns.duplicated().any():
-                df = df.loc[:, ~df.columns.duplicated()]
+            df.columns = df.columns.str.strip()
             
             label = sheet_labels.get(sheet, sheet)
             df['Vehicle Type'] = label
             
             sheet_columns[label] = list(df.columns)
             df_list.append(df)
-            
         except Exception as e:
-            st.error(f"Error processing tab '{sheet}': {e}")
+            st.error(f"Error loading tab '{sheet}': {e}")
             
     if df_list:
         combined_df = pd.concat(df_list, ignore_index=True, sort=False)
-        for core_col in ['Make', 'Model', 'Year Range']:
-            if core_col not in combined_df.columns:
-                combined_df[core_col] = ""
         return combined_df, sheet_columns
     else:
-        st.error("🚨 Error: No valid data could be compiled from your Google Sheet.")
+        st.error("No data could be retrieved from any Google Sheet tab.")
         return pd.DataFrame(), {}
 
 @st.cache_data(ttl=600)
@@ -120,6 +91,11 @@ def show_sidebar_menu():
             st.divider()
 
             if side_df.empty:
+                st.info("No data found in the Sidebar tab.")
+                return
+
+            if not all(col in side_df.columns for col in ['Category', 'Sub-Category', 'Link']):
+                st.error("Your Sidebar tab must have columns named: Category, Sub-Category, Link")
                 return
 
             categories = side_df['Category'].dropna().unique()
@@ -158,35 +134,16 @@ def main():
         show_sidebar_menu()
         st.subheader("Search Specs")
 
-        # Category Selection Matching Radio buttons
-        category_options = ["Cars / Light Commercial", "Motorcycles", "Vans", "HGV"]
-        selected_category = st.radio("SELECT VEHICLE CATEGORY", options=category_options, horizontal=True)
-        
-        filtered_by_cat = df[df['Vehicle Type'] == selected_category]
+        if 'Model' in df.columns:
+            df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
 
-        if 'Make' in filtered_by_cat.columns:
-            make_options = sorted([str(m).strip() for m in filtered_by_cat['Make'].dropna().unique() if str(m).strip().lower() != 'nan' and str(m).strip() != ""])
-        else:
-            make_options = []
+        selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
+        filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
 
-        selected_make = st.selectbox("MAKE", options=[""] + make_options)
-        filtered_by_make = filtered_by_cat if not selected_make else filtered_by_cat[filtered_by_cat['Make'] == selected_make]
-
-        if 'Model' in filtered_by_make.columns:
-            filtered_by_make['Clean_Model'] = filtered_by_make['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
-            model_options = sorted([str(m).strip() for m in filtered_by_make['Clean_Model'].dropna().unique() if str(m).strip().lower() != 'nan' and str(m).strip() != ""])
-        else:
-            model_options = []
-
-        selected_model = st.selectbox("MODEL", options=[""] + model_options)
+        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
         filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         
-        if 'Year Range' in filtered_by_model.columns:
-            year_options = sorted([str(y).strip() for y in filtered_by_model['Year Range'].dropna().unique() if str(y).strip().lower() != 'nan' and str(y).strip() != ""])
-        else:
-            year_options = []
-
-        selected_year = st.selectbox("YEAR RANGE", options=[""] + year_options)
+        selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
             st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
@@ -225,6 +182,7 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
+            # --- SECTIONS DICTIONARY ---
             sections = {
                 "🪫 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS & TORQUE": ["jack", "torque"], 
@@ -271,6 +229,7 @@ def main():
                                             st.success("Submitted!")
                             displayed.add(col)
 
+            # --- DYNAMIC OTHER SPECIFICATIONS CATCH-ALL ---
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 current_type = record.get('Vehicle Type', '')
@@ -305,13 +264,16 @@ def main():
                 if not found_other:
                     st.write("No additional information available.")
 
+            # --- NEW GLOBAL ADDITIONAL INFORMATION SUBMISSION FORM ---
             with st.expander("➕ SUBMIT MISSING OR ADDITIONAL INFORMATION"):
                 with st.form("general_missing_info_form", clear_on_submit=True):
                     st.write("Know something else about this vehicle? Provide text notes, attach a photo, or submit both below.")
-                    extra_notes = st.text_area("Additional Info / Operational Notes", placeholder="e.g., AdBlue tank is behind driver panel.")
+                    
+                    extra_notes = st.text_area("Additional Info / Operational Notes", placeholder="e.g., AdBlue tank is behind the driver panel. Tow eye is counter-clockwise threaded.")
                     
                     photo_mode = st.radio("Attach a Photo?", ["No Photo", "Upload Photo From Device", "Take Photo with Camera"], key="gen_photo_mode")
                     attached_file = None
+                    
                     if photo_mode == "Upload Photo From Device":
                         attached_file = st.file_uploader("Choose image file", type=['jpg', 'png', 'jpeg'], key="gen_file_upload")
                     elif photo_mode == "Take Photo with Camera":
@@ -325,6 +287,7 @@ def main():
                             if attached_file:
                                 base64_img = base64.b64encode(attached_file.getvalue()).decode('utf-8')
                                 
+                            # Packages details dynamically tied to the active vehicle lookup
                             payload = {
                                 "type": "general_missing_info",
                                 "make": record.get('Make', ''),
@@ -333,12 +296,13 @@ def main():
                                 "notes": extra_notes.strip(),
                                 "image": base64_img
                             }
+                            
                             try:
                                 response = requests.post(GOOGLE_SCRIPT_URL, json=payload)
                                 if response.status_code == 200:
-                                    st.success("Information submitted successfully!")
+                                    st.success("Information submitted to data operations successfully!")
                                 else:
-                                    st.error(f"Error: Status {response.status_code}")
+                                    st.error(f"Server acknowledged error: Status {response.status_code}")
                             except Exception as e:
                                 st.error(f"Failed to transmit details: {e}")
 
