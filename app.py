@@ -21,6 +21,9 @@ st.markdown("""
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     
+    /* Horizontal radio buttons layout styling */
+    div[data-testid="stMarkdownContainer"] p { color: #ffffff !important; }
+    
     /* --- MAGIC HAMBURGER CSS --- */
     [data-testid="collapsedControl"] svg {
         display: none !important;
@@ -39,10 +42,11 @@ st.markdown("""
 @st.cache_data(ttl=600)
 def load_all_data():
     sheets = ["Vehicle_Library", "Motorcycles", "Vans", "HGV"]
+    # EXACT match definitions to sync UI and Data perfectly
     sheet_labels = {
-        "Vehicle_Library": "Car / Light Commercial",
-        "Motorcycles": "Motorcycle",
-        "Vans": "Van",
+        "Vehicle_Library": "Cars / Light Commercial",
+        "Motorcycles": "Motorcycles",
+        "Vans": "Vans",
         "HGV": "HGV"
     }
     
@@ -51,38 +55,23 @@ def load_all_data():
     
     for sheet in sheets:
         try:
-            # 1. Primary Attempt to load tab
             url = f"https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet={sheet}"
             df = pd.read_csv(url)
             df.columns = df.columns.str.strip()
             
-            # Check if this sheet actually contains real data headers
-            has_make_col = any(k in str(c).lower() for c in df.columns for k in ['make', 'manufacturer', 'brand'])
-            
-            # 2. Smart Fallback: If it's Vehicle_Library and failed, try it with a space instead of underscore
-            if not has_make_col and sheet == "Vehicle_Library":
-                alt_url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle+Library"
-                df_alt = pd.read_csv(alt_url)
-                df_alt.columns = df_alt.columns.str.strip()
-                if any(k in str(c).lower() for c in df_alt.columns for k in ['make', 'manufacturer', 'brand']):
-                    df = df_alt
-                    has_make_col = True
-            
-            # 3. Validation Check: Stop broken sheets or Google Error responses from polluting data
-            columns_str = " ".join(df.columns.astype(str)).lower()
-            if not has_make_col or "error" in columns_str or "<html" in columns_str:
-                st.error(f"⚠️ **Tab Connection Alert:** Connected to tab **'{sheet}'**, but it contains no visible vehicle data or is spelled incorrectly on your Google Sheet. (Columns found: {list(df.columns)[:3]})")
+            # Defensive validation against broken data responses
+            if df.empty or len(df.columns) < 2:
                 continue
-            
+                
             # --- DEFENSIVE COLUMN ALIGNMENT ---
             rename_dict = {}
             for col in df.columns:
                 c_low = str(col).strip().lower()
-                if c_low in ['make', 'manufacturer', 'brand', 'vehicle make']:
+                if 'make' in c_low or 'manufacturer' in c_low:
                     rename_dict[col] = 'Make'
-                elif c_low in ['model', 'vehicle model']:
+                elif 'model' in c_low:
                     rename_dict[col] = 'Model'
-                elif c_low in ['year range', 'yearrange', 'year']:
+                elif 'year' in c_low:
                     rename_dict[col] = 'Year Range'
                 else:
                     rename_dict[col] = str(col).strip()
@@ -95,7 +84,7 @@ def load_all_data():
             df_list.append(df)
             
         except Exception as e:
-            st.error(f"Critical error processing tab '{sheet}': {e}")
+            st.error(f"Error processing tab '{sheet}': {e}")
             
     if df_list:
         combined_df = pd.concat(df_list, ignore_index=True, sort=False)
@@ -104,7 +93,7 @@ def load_all_data():
                 combined_df[core_col] = ""
         return combined_df, sheet_columns
     else:
-        st.error("🚨 Error: No valid data could be compiled from any Google Sheet tab.")
+        st.error("🚨 Error: No valid data could be compiled from your Google Sheet.")
         return pd.DataFrame(), {}
 
 @st.cache_data(ttl=600)
@@ -128,11 +117,6 @@ def show_sidebar_menu():
             st.divider()
 
             if side_df.empty:
-                st.info("No data found in the Sidebar tab.")
-                return
-
-            if not all(col in side_df.columns for col in ['Category', 'Sub-Category', 'Link']):
-                st.error("Your Sidebar tab must have columns named: Category, Sub-Category, Link")
                 return
 
             categories = side_df['Category'].dropna().unique()
@@ -171,13 +155,21 @@ def main():
         show_sidebar_menu()
         st.subheader("Search Specs")
 
-        if 'Make' in df.columns:
-            make_options = sorted([str(m).strip() for m in df['Make'].dropna().unique() if str(m).strip().lower() != 'nan' and str(m).strip() != ""])
+        # --- 1. CATEGORY SELECTION MATCHING YOUR SCREENSHOT ---
+        category_options = ["Cars / Light Commercial", "Motorcycles", "Vans", "HGV"]
+        selected_category = st.radio("SELECT VEHICLE CATEGORY", options=category_options, horizontal=True)
+        
+        # Filter data down to the selected category first
+        filtered_by_cat = df[df['Vehicle Type'] == selected_category]
+
+        # --- 2. DYNAMIC DROPDOWNS BASED ON SELECTION ---
+        if 'Make' in filtered_by_cat.columns:
+            make_options = sorted([str(m).strip() for m in filtered_by_cat['Make'].dropna().unique() if str(m).strip().lower() != 'nan' and str(m).strip() != ""])
         else:
             make_options = []
 
         selected_make = st.selectbox("MAKE", options=[""] + make_options)
-        filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
+        filtered_by_make = filtered_by_cat if not selected_make else filtered_by_cat[filtered_by_cat['Make'] == selected_make]
 
         if 'Model' in filtered_by_make.columns:
             filtered_by_make['Clean_Model'] = filtered_by_make['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
