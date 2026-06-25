@@ -42,9 +42,28 @@ st.markdown("""
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
     df = pd.read_csv(url)
-    df.columns = df.columns.str.strip() 
+    df.columns = [str(c).strip() for c in df.columns]
     
-    # --- DEDUPLICATION GUARDRAIL (Prevents InvalidIndexError) ---
+    # --- SMART COLUMN ALIGNMENT ---
+    # Catches variations in your Google Sheet and forces them to standard names
+    rename_dict = {}
+    for col in df.columns:
+        c_low = col.lower()
+        if c_low in ['make', 'manufacturer', 'brand', 'vehicle make']:
+            rename_dict[col] = 'Make'
+        elif c_low in ['model', 'vehicle model']:
+            rename_dict[col] = 'Model'
+        elif c_low in ['year range', 'yearrange', 'year']:
+            rename_dict[col] = 'Year Range'
+            
+    df = df.rename(columns=rename_dict)
+    
+    # Fallback: If the sheet is totally empty, create empty columns so it doesn't crash
+    for core_col in ['Make', 'Model', 'Year Range']:
+        if core_col not in df.columns:
+            df[core_col] = ""
+    
+    # --- DEDUPLICATION GUARDRAIL ---
     if df.columns.duplicated().any():
         df = df.loc[:, ~df.columns.duplicated()]
         
@@ -54,7 +73,7 @@ def load_data():
 def load_sidebar_data():
     url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Sidebar"
     df = pd.read_csv(url)
-    df.columns = df.columns.str.strip()
+    df.columns = [str(c).strip() for c in df.columns]
     return df
 
 def is_valid(val):
@@ -126,14 +145,21 @@ def main():
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
-        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
-        
-        if not selected_model:
-            filtered_by_model = filtered_by_make
+        # Guardrail in case 'Clean_Model' couldn't be created
+        if 'Clean_Model' in filtered_by_make.columns:
+            selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
+            if not selected_model:
+                filtered_by_model = filtered_by_make
+            else:
+                filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         else:
-            filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
+            filtered_by_model = filtered_by_make
+            selected_model = ""
         
-        selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
+        if 'Year Range' in filtered_by_model.columns:
+            selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
+        else:
+            selected_year = ""
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
             st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
@@ -221,13 +247,13 @@ def main():
                                     if img_file and st.button(f"Submit Photo for {col}", key=f"btn_{col}"):
                                         bytes_data = img_file.getvalue()
                                         base64_str = base64.b64encode(bytes_data).decode('utf-8')
-                                        requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record['Make'], "model": record['Model'], "column": col, "image": base64_str})
+                                        requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record.get('Make', ''), "model": record.get('Model', ''), "column": col, "image": base64_str})
                                         st.success("Uploaded!")
                                 else:
                                     with st.form(f"form_{col}_{record.name}"):
                                         new_val = st.text_input(f"Add info")
                                         if st.form_submit_button("Submit"):
-                                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val})
+                                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record.get('Make', ''), "model": record.get('Model', ''), "column": col, "newValue": new_val})
                                             st.success("Submitted!")
                             displayed.add(col)
             
@@ -250,7 +276,7 @@ def main():
                 st.rerun()
         else:
             for idx, row in results.iterrows():
-                if st.button(f"{row['Make']} | {row['Model']} | {row['Year Range']}", key=f"list_{idx}", use_container_width=True):
+                if st.button(f"{row.get('Make', '')} | {row.get('Model', '')} | {row.get('Year Range', '')}", key=f"list_{idx}", use_container_width=True):
                     st.session_state.results = results.loc[[idx]]
                     st.rerun()
 
