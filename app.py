@@ -40,6 +40,7 @@ st.markdown("""
 # --- DATA FETCHING FUNCTIONS ---
 @st.cache_data(ttl=600)
 def load_data():
+    # Targets the 'Vehicle_Library' tab explicitly
     url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
     df = pd.read_csv(url)
     df.columns = df.columns.str.strip() 
@@ -47,6 +48,7 @@ def load_data():
 
 @st.cache_data(ttl=600)
 def load_sidebar_data():
+    # Targets the 'Sidebar' tab explicitly
     url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Sidebar"
     df = pd.read_csv(url)
     df.columns = df.columns.str.strip()
@@ -57,7 +59,7 @@ def is_valid(val):
     str_val = str(val).strip().lower()
     return str_val != 'nan' and str_val != ''
 
-# --- SIDEBAR MENU (TESTING MODE) ---
+# --- SIDEBAR MENU ---
 def show_sidebar_menu():
     try:
         side_df = load_sidebar_data()
@@ -107,13 +109,20 @@ def main():
         pass
 
     df = load_data()
+
+    # 🚨 GUARDRAIL: Catching invisible spaces/typos in the sheet tab names
+    if 'Make' not in df.columns:
+        st.error("### 🚨 Connection Error: Cannot find the Vehicle Data!")
+        st.write("Google is ignoring the tab name because of an invisible trailing space in your sheet tab.")
+        st.info("💡 **How to fix this instantly:** Go to your Google Sheet, click the small arrow next to your **Vehicle_Library** tab name, select **Rename**, and check if there is an accidental space at the very end of the text. Delete that space, save it, and refresh this app!")
+        return 
+
     if 'Model' in df.columns:
         df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
     
     if 'show_results' not in st.session_state: st.session_state.show_results = False
 
     if not st.session_state.show_results:
-        # ONLY show the sidebar menu on the main search page
         show_sidebar_menu()
 
         st.subheader("Search Specs")
@@ -153,7 +162,6 @@ def main():
                         st.error(f"Error submitting: {e}")
 
     else:
-        # HIDE the hamburger toggle button entirely on the results page
         st.markdown("""
             <style>
             [data-testid="collapsedControl"] { display: none !important; }
@@ -172,7 +180,6 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            # --- UPDATED SECTIONS DICTIONARY HERE ---
             sections = {
                 "🪫 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS": ["jack", "torque"], 
