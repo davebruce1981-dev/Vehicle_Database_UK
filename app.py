@@ -22,11 +22,9 @@ st.markdown("""
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     
     /* --- MAGIC HAMBURGER CSS --- */
-    /* Hide the default Streamlit arrows */
     [data-testid="collapsedControl"] svg {
         display: none !important;
     }
-    /* Replace with Hamburger icon */
     [data-testid="collapsedControl"]::after {
         content: "☰";
         font-size: 26px;
@@ -40,7 +38,6 @@ st.markdown("""
 # --- DATA FETCHING FUNCTIONS ---
 @st.cache_data(ttl=600)
 def load_all_data():
-    # List of all your vehicle tabs from your Google Sheet
     sheets = ["Vehicle_Library", "Motorcycles", "Vans", "HGV"]
     sheet_labels = {
         "Vehicle_Library": "Car / Light Commercial",
@@ -50,6 +47,7 @@ def load_all_data():
     }
     
     df_list = []
+    sheet_columns = {} 
     
     for sheet in sheets:
         try:
@@ -57,19 +55,20 @@ def load_all_data():
             df = pd.read_csv(url)
             df.columns = df.columns.str.strip()
             
-            # Inject a helper column so the driver knows which category this record came from
-            df['Vehicle Type'] = sheet_labels.get(sheet, sheet)
+            label = sheet_labels.get(sheet, sheet)
+            df['Vehicle Type'] = label
+            
+            sheet_columns[label] = list(df.columns)
             df_list.append(df)
         except Exception as e:
             st.error(f"Error loading tab '{sheet}': {e}")
             
     if df_list:
-        # Merge all sheets together into one master table seamlessly
         combined_df = pd.concat(df_list, ignore_index=True, sort=False)
-        return combined_df
+        return combined_df, sheet_columns
     else:
         st.error("No data could be retrieved from any Google Sheet tab.")
-        return pd.DataFrame()
+        return pd.DataFrame(), {}
 
 @st.cache_data(ttl=600)
 def load_sidebar_data():
@@ -83,17 +82,16 @@ def is_valid(val):
     str_val = str(val).strip().lower()
     return str_val != 'nan' and str_val != ''
 
-# --- SIDEBAR MENU (TESTING MODE) ---
+# --- SIDEBAR MENU ---
 def show_sidebar_menu():
     try:
         side_df = load_sidebar_data()
-
         with st.sidebar:
             st.header("📚 Generic Resources")
             st.divider()
 
             if side_df.empty:
-                st.info("No data found in the Sidebar tab. Add rows to see them here.")
+                st.info("No data found in the Sidebar tab.")
                 return
 
             if not all(col in side_df.columns for col in ['Category', 'Sub-Category', 'Link']):
@@ -101,12 +99,10 @@ def show_sidebar_menu():
                 return
 
             categories = side_df['Category'].dropna().unique()
-
             for cat in categories:
                 if is_valid(cat):
                     st.subheader(f"🗂️ {cat}")
                     subset = side_df[side_df['Category'] == cat]
-
                     for _, row in subset.iterrows():
                         sub_cat = str(row.get('Sub-Category', 'Resource')).strip()
                         link = str(row.get('Link', '')).strip()
@@ -118,9 +114,7 @@ def show_sidebar_menu():
 
                         if is_valid(sub_cat) and sub_cat != 'nan':
                             st.link_button(f"🔗 {sub_cat}", url=link, use_container_width=True)
-
                     st.write("") 
-
     except Exception as e:
         st.sidebar.error(f"Sidebar error: {e}")
 
@@ -132,31 +126,23 @@ def main():
     except:
         pass
 
+    df, sheet_columns = load_all_data()
+
     if 'show_results' not in st.session_state: st.session_state.show_results = False
 
     if not st.session_state.show_results:
-        # ONLY show the sidebar menu on the main search page
         show_sidebar_menu()
-
         st.subheader("Search Specs")
-
-        # Load the combined global database directly
-        df = load_all_data()
 
         if 'Model' in df.columns:
             df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
 
-        # Global drop-downs automatically showing unique values across ALL combined sheets
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
 
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
-
-        if not selected_model:
-            filtered_by_model = filtered_by_make
-        else:
-            filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
-
+        filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
+        
         selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
@@ -181,12 +167,7 @@ def main():
                     except: st.error("Error submitting.")
 
     else:
-        # HIDE the hamburger toggle button entirely on the results page
-        st.markdown("""
-            <style>
-            [data-testid="collapsedControl"] { display: none !important; }
-            </style>
-        """, unsafe_allow_html=True)
+        st.markdown("<style>[data-testid=\"collapsedControl\"] { display: none !important; }</style>", unsafe_allow_html=True)
 
         results = st.session_state.results
         if len(results) == 1:
@@ -195,7 +176,6 @@ def main():
             st.divider()
 
             st.subheader("General Details")
-            # Added 'Vehicle Type' here so operators instantly see which tab this record came from!
             general_cols = ['Vehicle Type', 'Fuel Type', 'Drivetrain', 'Engine', 'Engine Size', 'Engine Displacement (cc)', 'Axle Config']
             for col in general_cols:
                 if col in record.index and is_valid(record[col]):
@@ -225,16 +205,9 @@ def main():
                                     img_src = val
                                     if "drive.google.com" in val or "docs.google.com" in val:
                                         match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', val) or re.search(r'id=([a-zA-Z0-9_-]+)', val)
-                                        if match:
-                                            file_id = match.group(1)
-                                            img_src = f"https://drive.google.com/thumbnail?id={file_id}&sz=w400"
+                                        if match: img_src = f"https://drive.google.com/thumbnail?id={match.group(1)}&sz=w400"
 
-                                    st.markdown(f"""
-                                        <a href="{val}" target="_blank">
-                                            <img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
-                                        </a>
-                                    """, unsafe_allow_html=True)
-
+                                    st.markdown(f'<a href="{val}" target="_blank"><img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;"></a>', unsafe_allow_html=True)
                                 elif "http" in val.lower():
                                     st.link_button(f"🌐 View {col}", url=val)
                                 else:
@@ -245,8 +218,7 @@ def main():
                                     action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{col}")
                                     img_file = st.file_uploader(f"Choose file", type=['jpg', 'png', 'jpeg'], key=f"uploader_{col}") if action == "Upload Photo" else st.camera_input(f"Camera", key=f"camera_{col}")
                                     if img_file and st.button(f"Submit Photo for {col}", key=f"btn_{col}"):
-                                        bytes_data = img_file.getvalue()
-                                        base64_str = base64.b64encode(bytes_data).decode('utf-8')
+                                        base64_str = base64.b64encode(img_file.getvalue()).decode('utf-8')
                                         requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record['Make'], "model": record['Model'], "column": col, "image": base64_str})
                                         st.success("Uploaded!")
                                 else:
@@ -257,20 +229,82 @@ def main():
                                             st.success("Submitted!")
                             displayed.add(col)
 
-            # --- OTHER SPECIFICATIONS CATCH-ALL ---
+            # --- DYNAMIC OTHER SPECIFICATIONS CATCH-ALL ---
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
-                for col in record.index:
-                    if col not in displayed and is_valid(record[col]):
+                current_type = record.get('Vehicle Type', '')
+                allowed_columns = sheet_columns.get(current_type, list(record.index))
+                
+                for col in allowed_columns:
+                    if col in record.index and col not in displayed:
                         val = str(record[col])
-                        if "http" in val.lower() or "link" in col.lower() or "yuasa" in col.lower() or "dvla" in col.lower():
-                            st.link_button(f"🌐 {col}", url=val, use_container_width=True)
+                        st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
+
+                        if is_valid(val):
+                            if "http" in val.lower() or "link" in col.lower() or "yuasa" in col.lower() or "dvla" in col.lower():
+                                st.link_button(f"🌐 {col}", url=val, use_container_width=True)
+                            else:
+                                st.write(f"**{col}:** {val}")
                         else:
-                            st.write(f"**{col}:** {val}")
+                            if "photo" in col.lower():
+                                action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_other_{col}")
+                                img_file = st.file_uploader(f"Choose file", type=['jpg', 'png', 'jpeg'], key=f"uploader_other_{col}") if action == "Upload Photo" else st.camera_input(f"Camera", key=f"camera_other_{col}")
+                                if img_file and st.button(f"Submit Photo for {col}", key=f"btn_other_{col}"):
+                                    base64_str = base64.b64encode(img_file.getvalue()).decode('utf-8')
+                                    requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record['Make'], "model": record['Model'], "column": col, "image": base64_str})
+                                    st.success("Uploaded!")
+                            else:
+                                with st.form(f"form_other_{col}_{record.name}"):
+                                    new_val = st.text_input(f"Add info")
+                                    if st.form_submit_button("Submit"):
+                                        requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val})
+                                        st.success("Submitted!")
                         found_other = True
 
                 if not found_other:
                     st.write("No additional information available.")
+
+            # --- NEW GLOBAL ADDITIONAL INFORMATION SUBMISSION FORM ---
+            with st.expander("➕ SUBMIT MISSING OR ADDITIONAL INFORMATION"):
+                with st.form("general_missing_info_form", clear_on_submit=True):
+                    st.write("Know something else about this vehicle? Provide text notes, attach a photo, or submit both below.")
+                    
+                    extra_notes = st.text_area("Additional Info / Operational Notes", placeholder="e.g., AdBlue tank is behind the driver panel. Tow eye is counter-clockwise threaded.")
+                    
+                    photo_mode = st.radio("Attach a Photo?", ["No Photo", "Upload Photo From Device", "Take Photo with Camera"], key="gen_photo_mode")
+                    attached_file = None
+                    
+                    if photo_mode == "Upload Photo From Device":
+                        attached_file = st.file_uploader("Choose image file", type=['jpg', 'png', 'jpeg'], key="gen_file_upload")
+                    elif photo_mode == "Take Photo with Camera":
+                        attached_file = st.camera_input("Capture image", key="gen_camera_input")
+                        
+                    if st.form_submit_button("SUBMIT SPECS UPDATE"):
+                        if not extra_notes.strip() and not attached_file:
+                            st.warning("Please type a note or provide an image before submitting.")
+                        else:
+                            base64_img = ""
+                            if attached_file:
+                                base64_img = base64.b64encode(attached_file.getvalue()).decode('utf-8')
+                                
+                            # Packages details dynamically tied to the active vehicle lookup
+                            payload = {
+                                "type": "general_missing_info",
+                                "make": record.get('Make', ''),
+                                "model": record.get('Model', ''),
+                                "year": record.get('Year Range', ''),
+                                "notes": extra_notes.strip(),
+                                "image": base64_img
+                            }
+                            
+                            try:
+                                response = requests.post(GOOGLE_SCRIPT_URL, json=payload)
+                                if response.status_code == 200:
+                                    st.success("Information submitted to data operations successfully!")
+                                else:
+                                    st.error(f"Server acknowledged error: Status {response.status_code}")
+                            except Exception as e:
+                                st.error(f"Failed to transmit details: {e}")
 
             if st.button("⬅ Back to Search"):
                 st.session_state.show_results = False
