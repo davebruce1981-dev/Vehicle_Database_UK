@@ -39,8 +39,9 @@ st.markdown("""
 
 # --- DATA FETCHING FUNCTIONS ---
 @st.cache_data(ttl=600)
-def load_data():
-    url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
+def load_data(sheet_name="Vehicle_Library"):
+    # Dynamically injects the selected tab name into the Google Sheet request URL
+    url = f"https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet={sheet_name}"
     df = pd.read_csv(url)
     df.columns = df.columns.str.strip() 
     return df
@@ -61,11 +62,11 @@ def is_valid(val):
 def show_sidebar_menu():
     try:
         side_df = load_sidebar_data()
-        
+
         with st.sidebar:
             st.header("📚 Generic Resources")
             st.divider()
-            
+
             if side_df.empty:
                 st.info("No data found in the Sidebar tab. Add rows to see them here.")
                 return
@@ -73,26 +74,26 @@ def show_sidebar_menu():
             if not all(col in side_df.columns for col in ['Category', 'Sub-Category', 'Link']):
                 st.error("Your Sidebar tab must have columns named: Category, Sub-Category, Link")
                 return
-            
+
             categories = side_df['Category'].dropna().unique()
 
             for cat in categories:
                 if is_valid(cat):
                     st.subheader(f"🗂️ {cat}")
                     subset = side_df[side_df['Category'] == cat]
-                    
+
                     for _, row in subset.iterrows():
                         sub_cat = str(row.get('Sub-Category', 'Resource')).strip()
                         link = str(row.get('Link', '')).strip()
-                        
+
                         if not is_valid(link) or link == 'nan':
                             link = "https://example.com"
                         elif not link.startswith("http"):
                             link = "https://" + link
-                            
+
                         if is_valid(sub_cat) and sub_cat != 'nan':
                             st.link_button(f"🔗 {sub_cat}", url=link, use_container_width=True)
-                    
+
                     st.write("") 
 
     except Exception as e:
@@ -106,10 +107,6 @@ def main():
     except:
         pass
 
-    df = load_data()
-    if 'Model' in df.columns:
-        df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
-    
     if 'show_results' not in st.session_state: st.session_state.show_results = False
 
     if not st.session_state.show_results:
@@ -118,23 +115,45 @@ def main():
 
         st.subheader("Search Specs")
 
+        # --- VEHICLE CATEGORY SELECTOR ---
+        v_type = st.radio(
+            "SELECT VEHICLE CATEGORY", 
+            ["Cars / Light Commercial", "Motorcycles", "Vans", "HGV"], 
+            horizontal=True
+        )
+
+        # Mapping your choices to the exact Google Sheet tab names from your screenshot
+        sheet_map = {
+            "Cars / Light Commercial": "Vehicle_Library",
+            "Motorcycles": "Motorcycles",
+            "Vans": "Vans",
+            "HGV": "HGV"
+        }
+        
+        # Pull the correct dataset based on driver choice
+        df = load_data(sheet_map[v_type])
+
+        if 'Model' in df.columns:
+            df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
+
+        # Dynamic drop-downs filtered by the current active database
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
-        
+
         selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
-        
+
         if not selected_model:
             filtered_by_model = filtered_by_make
         else:
             filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
-        
+
         selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
             st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
             st.session_state.show_results = True
             st.rerun()
-            
+
         st.divider()
 
         with st.expander("➕ Report Missing Vehicle"):
@@ -143,7 +162,7 @@ def main():
                 n_model = st.text_input("Model")
                 n_year = st.text_input("Year Range")
                 n_details = st.text_input("Additional Details")
-                
+
                 if st.form_submit_button("Submit Request"):
                     payload = {"type": "new_request", "make": n_make, "model": n_model, "year": n_year, "details": n_details}
                     try:
@@ -166,29 +185,32 @@ def main():
             st.divider()
 
             st.subheader("General Details")
-            for col in ['Fuel Type', 'Drivetrain', 'Engine']:
+            # Combined list of standard headers across Cars, Bikes, Vans, and HGVs
+            general_cols = ['Fuel Type', 'Drivetrain', 'Engine', 'Engine Size', 'Engine Displacement (cc)', 'Axle Config']
+            for col in general_cols:
                 if col in record.index and is_valid(record[col]):
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            # --- UPDATED SECTIONS DICTIONARY HERE ---
+            # --- UPDATED SECTIONS DICTIONARY WITH SMART KEYWORDS ---
             sections = {
                 "🪫 BATTERY DETAILS": ["battery"], 
-                "🏋️ JACKING POINTS": ["jack", "torque"], 
+                "🏋️ JACKING POINTS & TORQUE": ["jack", "torque"], 
                 "🔌 OBD LOCATION": ["obd", "odb"],
                 "🅿️ HANDBRAKE RELEASE": ["electric handbrake"],
                 "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear"]
             }
-            
-            displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model'}
-            
+
+            # Avoid duplicating general fields into the main feature expanders
+            displayed = {'Make', 'Model', 'Year Range', 'Clean_Model'}.union(set(general_cols))
+
             for label, keywords in sections.items():
                 with st.expander(label):
                     for col in record.index:
                         if any(k in col.lower() for k in keywords) and col not in displayed:
                             val = str(record[col])
                             st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
-                            
+
                             if is_valid(val):
                                 if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
                                     img_src = val
@@ -203,7 +225,7 @@ def main():
                                             <img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
                                         </a>
                                     """, unsafe_allow_html=True)
-                                    
+
                                 elif "http" in val.lower():
                                     st.link_button(f"🌐 View {col}", url=val)
                                 else:
@@ -225,7 +247,9 @@ def main():
                                             requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val})
                                             st.success("Submitted!")
                             displayed.add(col)
-            
+
+            # --- OTHER SPECIFICATIONS CATCH-ALL ---
+            # This cleanly isolates unique elements like "Propshaft / halfshaft removal" for HGVs
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
@@ -236,10 +260,10 @@ def main():
                         else:
                             st.write(f"**{col}:** {val}")
                         found_other = True
-                
+
                 if not found_other:
                     st.write("No additional information available.")
-            
+
             if st.button("⬅ Back to Search"):
                 st.session_state.show_results = False
                 st.rerun()
