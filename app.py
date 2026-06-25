@@ -39,12 +39,37 @@ st.markdown("""
 
 # --- DATA FETCHING FUNCTIONS ---
 @st.cache_data(ttl=600)
-def load_data(sheet_name="Vehicle_Library"):
-    # Dynamically injects the selected tab name into the Google Sheet request URL
-    url = f"https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-    df = pd.read_csv(url)
-    df.columns = df.columns.str.strip() 
-    return df
+def load_all_data():
+    # List of all your vehicle tabs from your Google Sheet
+    sheets = ["Vehicle_Library", "Motorcycles", "Vans", "HGV"]
+    sheet_labels = {
+        "Vehicle_Library": "Car / Light Commercial",
+        "Motorcycles": "Motorcycle",
+        "Vans": "Van",
+        "HGV": "HGV"
+    }
+    
+    df_list = []
+    
+    for sheet in sheets:
+        try:
+            url = f"https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet={sheet}"
+            df = pd.read_csv(url)
+            df.columns = df.columns.str.strip()
+            
+            # Inject a helper column so the driver knows which category this record came from
+            df['Vehicle Type'] = sheet_labels.get(sheet, sheet)
+            df_list.append(df)
+        except Exception as e:
+            st.error(f"Error loading tab '{sheet}': {e}")
+            
+    if df_list:
+        # Merge all sheets together into one master table seamlessly
+        combined_df = pd.concat(df_list, ignore_index=True, sort=False)
+        return combined_df
+    else:
+        st.error("No data could be retrieved from any Google Sheet tab.")
+        return pd.DataFrame()
 
 @st.cache_data(ttl=600)
 def load_sidebar_data():
@@ -115,28 +140,13 @@ def main():
 
         st.subheader("Search Specs")
 
-        # --- VEHICLE CATEGORY SELECTOR ---
-        v_type = st.radio(
-            "SELECT VEHICLE CATEGORY", 
-            ["Cars / Light Commercial", "Motorcycles", "Vans", "HGV"], 
-            horizontal=True
-        )
-
-        # Mapping your choices to the exact Google Sheet tab names from your screenshot
-        sheet_map = {
-            "Cars / Light Commercial": "Vehicle_Library",
-            "Motorcycles": "Motorcycles",
-            "Vans": "Vans",
-            "HGV": "HGV"
-        }
-        
-        # Pull the correct dataset based on driver choice
-        df = load_data(sheet_map[v_type])
+        # Load the combined global database directly
+        df = load_all_data()
 
         if 'Model' in df.columns:
             df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
 
-        # Dynamic drop-downs filtered by the current active database
+        # Global drop-downs automatically showing unique values across ALL combined sheets
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
 
@@ -185,14 +195,14 @@ def main():
             st.divider()
 
             st.subheader("General Details")
-            # Combined list of standard headers across Cars, Bikes, Vans, and HGVs
-            general_cols = ['Fuel Type', 'Drivetrain', 'Engine', 'Engine Size', 'Engine Displacement (cc)', 'Axle Config']
+            # Added 'Vehicle Type' here so operators instantly see which tab this record came from!
+            general_cols = ['Vehicle Type', 'Fuel Type', 'Drivetrain', 'Engine', 'Engine Size', 'Engine Displacement (cc)', 'Axle Config']
             for col in general_cols:
                 if col in record.index and is_valid(record[col]):
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            # --- UPDATED SECTIONS DICTIONARY WITH SMART KEYWORDS ---
+            # --- SECTIONS DICTIONARY ---
             sections = {
                 "🪫 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS & TORQUE": ["jack", "torque"], 
@@ -201,7 +211,6 @@ def main():
                 "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear"]
             }
 
-            # Avoid duplicating general fields into the main feature expanders
             displayed = {'Make', 'Model', 'Year Range', 'Clean_Model'}.union(set(general_cols))
 
             for label, keywords in sections.items():
@@ -249,7 +258,6 @@ def main():
                             displayed.add(col)
 
             # --- OTHER SPECIFICATIONS CATCH-ALL ---
-            # This cleanly isolates unique elements like "Propshaft / halfshaft removal" for HGVs
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
