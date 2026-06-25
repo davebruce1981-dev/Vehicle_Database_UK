@@ -51,17 +51,36 @@ def load_all_data():
     
     for sheet in sheets:
         try:
+            # 1. Primary Attempt to load tab
             url = f"https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet={sheet}"
             df = pd.read_csv(url)
+            df.columns = df.columns.str.strip()
+            
+            # Check if this sheet actually contains real data headers
+            has_make_col = any(k in str(c).lower() for c in df.columns for k in ['make', 'manufacturer', 'brand'])
+            
+            # 2. Smart Fallback: If it's Vehicle_Library and failed, try it with a space instead of underscore
+            if not has_make_col and sheet == "Vehicle_Library":
+                alt_url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle+Library"
+                df_alt = pd.read_csv(alt_url)
+                df_alt.columns = df_alt.columns.str.strip()
+                if any(k in str(c).lower() for c in df_alt.columns for k in ['make', 'manufacturer', 'brand']):
+                    df = df_alt
+                    has_make_col = True
+            
+            # 3. Validation Check: Stop broken sheets or Google Error responses from polluting data
+            columns_str = " ".join(df.columns.astype(str)).lower()
+            if not has_make_col or "error" in columns_str or "<html" in columns_str:
+                st.error(f"⚠️ **Tab Connection Alert:** Connected to tab **'{sheet}'**, but it contains no visible vehicle data or is spelled incorrectly on your Google Sheet. (Columns found: {list(df.columns)[:3]})")
+                continue
             
             # --- DEFENSIVE COLUMN ALIGNMENT ---
-            # Automatically maps case-mismatched headers from different sheets perfectly together
             rename_dict = {}
             for col in df.columns:
                 c_low = str(col).strip().lower()
-                if c_low == 'make':
+                if c_low in ['make', 'manufacturer', 'brand', 'vehicle make']:
                     rename_dict[col] = 'Make'
-                elif c_low == 'model':
+                elif c_low in ['model', 'vehicle model']:
                     rename_dict[col] = 'Model'
                 elif c_low in ['year range', 'yearrange', 'year']:
                     rename_dict[col] = 'Year Range'
@@ -74,20 +93,18 @@ def load_all_data():
             
             sheet_columns[label] = list(df.columns)
             df_list.append(df)
+            
         except Exception as e:
-            st.error(f"Error loading tab '{sheet}': {e}")
+            st.error(f"Critical error processing tab '{sheet}': {e}")
             
     if df_list:
         combined_df = pd.concat(df_list, ignore_index=True, sort=False)
-        
-        # Enforce that essential columns are guaranteed to exist globally
         for core_col in ['Make', 'Model', 'Year Range']:
             if core_col not in combined_df.columns:
                 combined_df[core_col] = ""
-                
         return combined_df, sheet_columns
     else:
-        st.error("No data could be retrieved from any Google Sheet tab.")
+        st.error("🚨 Error: No valid data could be compiled from any Google Sheet tab.")
         return pd.DataFrame(), {}
 
 @st.cache_data(ttl=600)
@@ -155,8 +172,7 @@ def main():
         st.subheader("Search Specs")
 
         if 'Make' in df.columns:
-            # Clean string normalization logic for dropdown preparation
-            make_options = sorted([str(m).strip() for m in df['Make'].dropna().unique() if str(m).strip().lower() != 'nan'])
+            make_options = sorted([str(m).strip() for m in df['Make'].dropna().unique() if str(m).strip().lower() != 'nan' and str(m).strip() != ""])
         else:
             make_options = []
 
@@ -165,16 +181,15 @@ def main():
 
         if 'Model' in filtered_by_make.columns:
             filtered_by_make['Clean_Model'] = filtered_by_make['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
-            model_options = sorted([str(m).strip() for m in filtered_by_make['Clean_Model'].dropna().unique() if str(m).strip().lower() != 'nan'])
+            model_options = sorted([str(m).strip() for m in filtered_by_make['Clean_Model'].dropna().unique() if str(m).strip().lower() != 'nan' and str(m).strip() != ""])
         else:
             model_options = []
 
         selected_model = st.selectbox("MODEL", options=[""] + model_options)
         filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         
-        # --- FIXED LINE 146 TYPE-SAFETY ---
         if 'Year Range' in filtered_by_model.columns:
-            year_options = sorted([str(y).strip() for y in filtered_by_model['Year Range'].dropna().unique() if str(y).strip().lower() != 'nan'])
+            year_options = sorted([str(y).strip() for y in filtered_by_model['Year Range'].dropna().unique() if str(y).strip().lower() != 'nan' and str(y).strip() != ""])
         else:
             year_options = []
 
@@ -217,7 +232,6 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            # --- SECTIONS DICTIONARY ---
             sections = {
                 "🪫 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS & TORQUE": ["jack", "torque"], 
@@ -264,7 +278,6 @@ def main():
                                             st.success("Submitted!")
                             displayed.add(col)
 
-            # --- DYNAMIC OTHER SPECIFICATIONS CATCH-ALL ---
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 current_type = record.get('Vehicle Type', '')
@@ -299,16 +312,13 @@ def main():
                 if not found_other:
                     st.write("No additional information available.")
 
-            # --- GLOBAL ADDITIONAL INFORMATION SUBMISSION FORM ---
             with st.expander("➕ SUBMIT MISSING OR ADDITIONAL INFORMATION"):
                 with st.form("general_missing_info_form", clear_on_submit=True):
                     st.write("Know something else about this vehicle? Provide text notes, attach a photo, or submit both below.")
-                    
-                    extra_notes = st.text_area("Additional Info / Operational Notes", placeholder="e.g., AdBlue tank is behind the driver panel. Tow eye is counter-clockwise threaded.")
+                    extra_notes = st.text_area("Additional Info / Operational Notes", placeholder="e.g., AdBlue tank is behind driver panel.")
                     
                     photo_mode = st.radio("Attach a Photo?", ["No Photo", "Upload Photo From Device", "Take Photo with Camera"], key="gen_photo_mode")
                     attached_file = None
-                    
                     if photo_mode == "Upload Photo From Device":
                         attached_file = st.file_uploader("Choose image file", type=['jpg', 'png', 'jpeg'], key="gen_file_upload")
                     elif photo_mode == "Take Photo with Camera":
@@ -330,13 +340,12 @@ def main():
                                 "notes": extra_notes.strip(),
                                 "image": base64_img
                             }
-                            
                             try:
                                 response = requests.post(GOOGLE_SCRIPT_URL, json=payload)
                                 if response.status_code == 200:
-                                    st.success("Information submitted to data operations successfully!")
+                                    st.success("Information submitted successfully!")
                                 else:
-                                    st.error(f"Server acknowledged error: Status {response.status_code}")
+                                    st.error(f"Error: Status {response.status_code}")
                             except Exception as e:
                                 st.error(f"Failed to transmit details: {e}")
 
