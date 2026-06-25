@@ -38,7 +38,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- SMART DATA FETCHING FUNCTIONS ---
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=10)
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
     # Load raw data without assuming row 1 is the header (fixes shifts caused by freezing/filtering)
