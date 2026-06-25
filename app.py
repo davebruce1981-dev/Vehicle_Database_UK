@@ -1,3 +1,13 @@
+That InvalidIndexError happens because of a sneaky side-effect from the loose column matching we introduced (if 'make' in c_low).
+
+When Google Sheets exports your data, if there are any blank columns or columns with similar names, Pandas automatically reads them as things like Make and Make.1 to keep them unique. Because our previous script used a broad "contains" check, it accidentally renamed both Make and Make.1 to exactly Make.
+
+When pd.concat() tries to stack your sheets together, it sees two columns with the exact same name in a single sheet, panics because it doesn't know which one is which, and throws that InvalidIndexError.
+
+To fix this, I have reverted the column mapping back to a strict match list and added an explicit deduplication guardrail that drops any accidental duplicate columns before merging.
+
+The Fixed Code
+Python
 import streamlit as st
 import pandas as pd
 import re
@@ -42,7 +52,6 @@ st.markdown("""
 @st.cache_data(ttl=600)
 def load_all_data():
     sheets = ["Vehicle_Library", "Motorcycles", "Vans", "HGV"]
-    # EXACT match definitions to sync UI and Data perfectly
     sheet_labels = {
         "Vehicle_Library": "Cars / Light Commercial",
         "Motorcycles": "Motorcycles",
@@ -57,25 +66,29 @@ def load_all_data():
         try:
             url = f"https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet={sheet}"
             df = pd.read_csv(url)
-            df.columns = df.columns.str.strip()
             
-            # Defensive validation against broken data responses
+            # Ensure all column headers are clean strings
+            df.columns = [str(c).strip() for c in df.columns]
+            
             if df.empty or len(df.columns) < 2:
                 continue
                 
-            # --- DEFENSIVE COLUMN ALIGNMENT ---
+            # --- STRICT COLUMN ALIGNMENT (Prevents clashing) ---
             rename_dict = {}
             for col in df.columns:
-                c_low = str(col).strip().lower()
-                if 'make' in c_low or 'manufacturer' in c_low:
+                c_low = col.lower()
+                if c_low in ['make', 'manufacturer', 'brand', 'vehicle make']:
                     rename_dict[col] = 'Make'
-                elif 'model' in c_low:
+                elif c_low in ['model', 'vehicle model']:
                     rename_dict[col] = 'Model'
-                elif 'year' in c_low:
+                elif c_low in ['year range', 'yearrange', 'year']:
                     rename_dict[col] = 'Year Range'
-                else:
-                    rename_dict[col] = str(col).strip()
+            
             df = df.rename(columns=rename_dict)
+            
+            # --- DEDUPLICATION GUARDRAIL (Fixes InvalidIndexError) ---
+            if df.columns.duplicated().any():
+                df = df.loc[:, ~df.columns.duplicated()]
             
             label = sheet_labels.get(sheet, sheet)
             df['Vehicle Type'] = label
@@ -155,14 +168,12 @@ def main():
         show_sidebar_menu()
         st.subheader("Search Specs")
 
-        # --- 1. CATEGORY SELECTION MATCHING YOUR SCREENSHOT ---
+        # Category Selection Matching Radio buttons
         category_options = ["Cars / Light Commercial", "Motorcycles", "Vans", "HGV"]
         selected_category = st.radio("SELECT VEHICLE CATEGORY", options=category_options, horizontal=True)
         
-        # Filter data down to the selected category first
         filtered_by_cat = df[df['Vehicle Type'] == selected_category]
 
-        # --- 2. DYNAMIC DROPDOWNS BASED ON SELECTION ---
         if 'Make' in filtered_by_cat.columns:
             make_options = sorted([str(m).strip() for m in filtered_by_cat['Make'].dropna().unique() if str(m).strip().lower() != 'nan' and str(m).strip() != ""])
         else:
