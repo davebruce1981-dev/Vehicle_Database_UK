@@ -37,21 +37,59 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DATA FETCHING FUNCTIONS ---
+# --- SMART DATA FETCHING FUNCTIONS ---
 @st.cache_data(ttl=600)
 def load_data():
-    # Targets the 'Vehicle_Library' tab explicitly
     url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
-    df = pd.read_csv(url)
-    df.columns = df.columns.str.strip() 
+    # Load raw data without assuming row 1 is the header (fixes shifts caused by freezing/filtering)
+    df = pd.read_csv(url, header=None)
+    
+    # Scan the first 15 rows to locate where the actual data table starts
+    header_idx = 0
+    for i, row in df.head(15).iterrows():
+        if row.astype(str).str.strip().str.lower().eq('make').any():
+            header_idx = i
+            break
+            
+    # Clean up column variations and enforce correct capitalization
+    raw_cols = df.iloc[header_idx].astype(str).str.strip()
+    clean_cols = []
+    for c in raw_cols:
+        cl = c.lower()
+        if cl == 'make': clean_cols.append('Make')
+        elif cl == 'model': clean_cols.append('Model')
+        elif cl == 'year range': clean_cols.append('Year Range')
+        elif cl == 'fuel type': clean_cols.append('Fuel Type')
+        elif cl == 'drivetrain': clean_cols.append('Drivetrain')
+        elif cl == 'engine': clean_cols.append('Engine')
+        else: clean_cols.append(c)
+        
+    df.columns = clean_cols
+    df = df.iloc[header_idx + 1:].reset_index(drop=True)
     return df
 
 @st.cache_data(ttl=600)
 def load_sidebar_data():
-    # Targets the 'Sidebar' tab explicitly
     url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Sidebar"
-    df = pd.read_csv(url)
-    df.columns = df.columns.str.strip()
+    df = pd.read_csv(url, header=None)
+    
+    header_idx = 0
+    for i, row in df.head(15).iterrows():
+        if row.astype(str).str.strip().str.lower().eq('category').any():
+            header_idx = i
+            break
+            
+    raw_cols = df.iloc[header_idx].astype(str).str.strip()
+    clean_cols = []
+    for c in raw_cols:
+        cl = c.lower()
+        if cl == 'category': clean_cols.append('Category')
+        elif cl == 'sub-category': clean_cols.append('Sub-Category')
+        elif cl == 'link': clean_cols.append('Link')
+        else: clean_cols.append(c)
+        
+    df.columns = clean_cols
+    df = df.iloc[header_idx + 1:].reset_index(drop=True)
     return df
 
 def is_valid(val):
@@ -110,7 +148,7 @@ def main():
 
     df = load_data()
 
-    # 🚨 GUARDRAIL: Catching invisible spaces/typos in the sheet tab names
+    # Dynamic Recovery Guardrail
     if 'Make' not in df.columns:
         st.error("### 🚨 Connection Error: Cannot find the Vehicle Data!")
         st.write("Google is ignoring the tab name because of an invisible trailing space in your sheet tab.")
