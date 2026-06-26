@@ -34,7 +34,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- DATA FETCHING ---
-@st.cache_data(ttl=10) # Set to 10 seconds for live building & testing updates
+@st.cache_data(ttl=10) # 10 seconds cache for live building & testing updates
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
     try:
@@ -160,35 +160,34 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            # Smart categories matching keywords to columns
+            # Cleaned up categories with reliable, cross-platform emojis
             sections = {
-                "¼ï©ï¸ HEAVY RECOVERY & DRIVETRAIN": ["propshaft", "half-shaft", "half shaft", "towing", "air brake", "cab tilt"],
-                "ðŸ«« BATTERY DETAILS": ["battery"], 
-                "ðŸ‹ï¸ JACKING POINTS": ["jack", "torque"], 
-                "ðŸ”Œ OBD LOCATION": ["obd", "odb"],
-                "ðŸ…¿ï¸ HANDBRAKE RELEASE": ["electric handbrake", "handbrake release"],
-                "âš™ï¸ GEAR NEUTRAL OVERRIDE": ["automatic gear", "neutral override"]
+                "🚛 DRIVETRAIN & TOWING SPECS": ["propshaft", "half-shaft", "half shaft", "towing", "air brake", "cab tilt"],
+                "🔋 BATTERY DETAILS": ["battery"], 
+                "🏋️ JACKING POINTS": ["jack", "torque"], 
+                "🔌 OBD LOCATION": ["obd", "odb"],
+                "🅿️ HANDBRAKE RELEASE": ["electric handbrake", "handbrake release"],
+                "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear", "neutral override"]
             }
             
-            # Add 'Heavy Vehicle?' to displayed set so we hide the literal 'Heavy Vehicle?: x' text from the operator
+            # Hide the raw trigger column from displaying as literal text
             displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model', 'Heavy Vehicle?'}
             
             for label, keywords in sections.items():
                 has_data_in_section = False
                 
-                # ðŸ”® THE "X" MASTER SWITCH LOGIC
-                if label == "¼ï©ï¸ HEAVY RECOVERY & DRIVETRAIN":
+                # Check the master 'X' override column first
+                if label == "🚛 DRIVETRAIN & TOWING SPECS":
                     if 'Heavy Vehicle?' in record.index and str(record['Heavy Vehicle?']).strip().lower() == 'x':
                         has_data_in_section = True
                 
-                # Backup safety net: check if any columns match keywords and have active data
+                # Fallback scan of matching text cells
                 if not has_data_in_section:
                     for col in record.index:
                         if any(k in col.lower() for k in keywords) and col not in displayed and is_valid(record[col]):
                             has_data_in_section = True
                             break
                 
-                # If there is no data and no 'X' switch turned on, completely hide this block
                 if not has_data_in_section:
                     continue
 
@@ -213,28 +212,26 @@ def main():
                                         </a>
                                     """, unsafe_allow_html=True)
                                 elif "http" in val.lower():
-                                    st.link_button(f"ðŸŒ View {col}", url=val)
+                                    st.link_button(f"🌐 View {col}", url=val)
                                 else:
                                     st.write(val)
                             displayed.add(col)
             
-            # Catch-all container for miscellaneous columns that possess data
-            with st.expander("ðŸ§© OTHER SPECIFICATIONS"):
+            with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
                     if col not in displayed and is_valid(record[col]):
                         val = str(record[col])
                         if "http" in val.lower() or "link" in col.lower() or "yuasa" in col.lower() or "dvla" in col.lower():
-                            st.link_button(f"ðŸŒ {col}", url=val, use_container_width=True)
+                            st.link_button(f"🌐 {col}", url=val, use_container_width=True)
                         else:
                             st.write(f"**{col}:** {val}")
                         found_other = True
                 if not found_other: 
                     st.write("No additional unique information recorded.")
             
-            # Universal, clean update submittal workflow
             st.write("")
-            with st.expander("ðŸ“ Suggest a Spec Update or Correction"):
+            with st.expander("📝 Suggest a Spec Update or Correction"):
                 with st.form(f"universal_update_{record.name}"):
                     up_col = st.selectbox("Which specification field needs updating?", options=[c for c in df.columns if c not in ['Make', 'Model', 'Year Range', 'Clean_Model', 'Heavy Vehicle?']])
                     new_val = st.text_input("Correct information / notes:")
@@ -245,7 +242,7 @@ def main():
                         except Exception as e:
                             st.error(f"Submission communication dropped: {e}")
 
-            if st.button("â¬… Back to Search"):
+            if st.button("⬅️ Back to Search"):
                 st.session_state.show_results = False
                 st.rerun()
         else:
