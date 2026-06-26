@@ -167,7 +167,7 @@ def main():
                 "🔌 OBD LOCATION": ["obd", "odb"],
                 "🅿️ HANDBRAKE RELEASE": ["electric handbrake", "handbrake release"],
                 "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear", "neutral override"],
-                "🚛 HEAVY RECOVERY": ["propshaft", "half-shaft", "half shaft", "towing", "air brake", "cab tilt"]
+                "🚛 HEAVY RECOVERY": ["propshaft", "half-shaft", "half shaft", "towing", "airline connectors", "cab tilt"]
             }
             
             displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model', 'Heavy Vehicle?'}
