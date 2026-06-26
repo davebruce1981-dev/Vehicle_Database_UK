@@ -160,19 +160,19 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            # The baseline configuration map for core expandable menus
+            # Fixed Emoji layout structure
             sections = {
-                "重量 DRIVETRAIN & TOWING SPECS": ["propshaft", "half-shaft", "half shaft", "towing", "air brake", "cab tilt"],
                 "🔋 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS": ["jack", "torque"], 
                 "🔌 OBD LOCATION": ["obd", "odb"],
                 "🅿️ HANDBRAKE RELEASE": ["electric handbrake", "handbrake release"],
-                "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear", "neutral override"]
+                "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear", "neutral override"],
+                "🚛 DRIVETRAIN & TOWING SPECS": ["propshaft", "half-shaft", "half shaft", "towing", "air brake", "cab tilt"]
             }
             
             displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model', 'Heavy Vehicle?'}
             
-            # Loop through every category header to force it to show up on screen
+            # Loop through the core expandable menus
             for label, keywords in sections.items():
                 with st.expander(label):
                     matched_any_columns = False
@@ -203,7 +203,6 @@ def main():
                                 else:
                                     st.write(val)
                             else:
-                                # Cell is blank: Show crowdsourcing entries so data can be collected live
                                 st.write("*No data yet*")
                                 if "photo" in col.lower():
                                     action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{col}_{record.name}")
@@ -227,11 +226,10 @@ def main():
                                                 st.error(f"Submission failed: {e}")
                             displayed.add(col)
                     
-                    # If a column header for this category doesn't even exist in your spreadsheet yet
                     if not matched_any_columns:
                         st.write("*No active specification columns found for this category in the Google Sheet.*")
             
-            # Catch-all container for miscellaneous columns that possess data
+            # Positioned perfectly below the core list expanders
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
