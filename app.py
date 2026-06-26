@@ -160,9 +160,9 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            # Cleaned up categories with reliable, cross-platform emojis
+            # The baseline configuration map for core expandable menus
             sections = {
-                "🚛 DRIVETRAIN & TOWING SPECS": ["propshaft", "half-shaft", "half shaft", "towing", "air brake", "cab tilt"],
+                "重量 DRIVETRAIN & TOWING SPECS": ["propshaft", "half-shaft", "half shaft", "towing", "air brake", "cab tilt"],
                 "🔋 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS": ["jack", "torque"], 
                 "🔌 OBD LOCATION": ["obd", "odb"],
@@ -170,34 +170,21 @@ def main():
                 "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear", "neutral override"]
             }
             
-            # Hide the raw trigger column from displaying as literal text
             displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model', 'Heavy Vehicle?'}
             
+            # Loop through every category header to force it to show up on screen
             for label, keywords in sections.items():
-                has_data_in_section = False
-                
-                # Check the master 'X' override column first
-                if label == "🚛 DRIVETRAIN & TOWING SPECS":
-                    if 'Heavy Vehicle?' in record.index and str(record['Heavy Vehicle?']).strip().lower() == 'x':
-                        has_data_in_section = True
-                
-                # Fallback scan of matching text cells
-                if not has_data_in_section:
-                    for col in record.index:
-                        if any(k in col.lower() for k in keywords) and col not in displayed and is_valid(record[col]):
-                            has_data_in_section = True
-                            break
-                
-                if not has_data_in_section:
-                    continue
-
                 with st.expander(label):
+                    matched_any_columns = False
+                    
                     for col in record.index:
                         if any(k in col.lower() for k in keywords) and col not in displayed:
+                            matched_any_columns = True
                             val = str(record[col])
                             
+                            st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
+                            
                             if is_valid(val):
-                                st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
                                 if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
                                     img_src = val
                                     if "drive.google.com" in val or "docs.google.com" in val:
@@ -215,8 +202,36 @@ def main():
                                     st.link_button(f"🌐 View {col}", url=val)
                                 else:
                                     st.write(val)
+                            else:
+                                # Cell is blank: Show crowdsourcing entries so data can be collected live
+                                st.write("*No data yet*")
+                                if "photo" in col.lower():
+                                    action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{col}_{record.name}")
+                                    img_file = st.file_uploader(f"Choose file", type=['jpg', 'png', 'jpeg'], key=f"uploader_{col}_{record.name}") if action == "Upload Photo" else st.camera_input(f"Camera", key=f"camera_{col}_{record.name}")
+                                    if img_file and st.button(f"Submit Photo for {col}", key=f"btn_{col}_{record.name}"):
+                                        bytes_data = img_file.getvalue()
+                                        base64_str = base64.b64encode(bytes_data).decode('utf-8')
+                                        try:
+                                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record['Make'], "model": record['Model'], "column": col, "image": base64_str})
+                                            st.success("Uploaded successfully!")
+                                        except Exception as e:
+                                            st.error(f"Upload failed: {e}")
+                                else:
+                                    with st.form(f"form_{col}_{record.name}"):
+                                        new_val = st.text_input(f"Add info")
+                                        if st.form_submit_button("Submit"):
+                                            try:
+                                                requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val})
+                                                st.success("Submitted successfully!")
+                                            except Exception as e:
+                                                st.error(f"Submission failed: {e}")
                             displayed.add(col)
+                    
+                    # If a column header for this category doesn't even exist in your spreadsheet yet
+                    if not matched_any_columns:
+                        st.write("*No active specification columns found for this category in the Google Sheet.*")
             
+            # Catch-all container for miscellaneous columns that possess data
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
