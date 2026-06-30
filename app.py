@@ -205,9 +205,11 @@ def main():
                             else:
                                 st.write("*No data yet*")
                                 if "photo" in col.lower():
-                                    action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{col}_{record.name}")
-                                    img_file = st.file_uploader(f"Choose file", type=['jpg', 'png', 'jpeg'], key=f"uploader_{col}_{record.name}") if action == "Upload Photo" else st.camera_input(f"Camera", key=f"camera_{col}_{record.name}")
-                                    if img_file and st.button(f"Submit Photo for {col}", key=f"btn_{col}_{record.name}"):
+                                    # Unique key generation using row index and sanitized column strings
+                                    clean_col = re.sub(r'[^a-zA-Z0-9]', '', col)
+                                    action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{clean_col}_{record.name}")
+                                    img_file = st.file_uploader(f"Choose file", type=['jpg', 'png', 'jpeg'], key=f"uploader_{clean_col}_{record.name}") if action == "Upload Photo" else st.camera_input(f"Camera", key=f"camera_{clean_col}_{record.name}")
+                                    if img_file and st.button(f"Submit Photo for {col}", key=f"btn_{clean_col}_{record.name}"):
                                         bytes_data = img_file.getvalue()
                                         base64_str = base64.b64encode(bytes_data).decode('utf-8')
                                         try:
@@ -216,7 +218,8 @@ def main():
                                         except Exception as e:
                                             st.error(f"Upload failed: {e}")
                                 else:
-                                    with st.form(f"form_{col}_{record.name}"):
+                                    clean_col = re.sub(r'[^a-zA-Z0-9]', '', col)
+                                    with st.form(f"form_{clean_col}_{record.name}"):
                                         new_val = st.text_input(f"Add info")
                                         if st.form_submit_button("Submit"):
                                             try:
