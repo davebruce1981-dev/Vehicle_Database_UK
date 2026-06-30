@@ -193,11 +193,17 @@ def main():
                                             file_id = match.group(1)
                                             img_src = f"https://drive.google.com/thumbnail?id={file_id}&sz=w400"
                                     
-                                    # OPTION A: Native Streamlit Image Preview (Avoids Google picker popups)
+                                    # OPTION B: Bypasses the native drive app routing via custom clean layout
                                     if "drive.google.com" in val or "docs.google.com" in val:
-                                        st.image(img_src.replace("sz=w400", "sz=w1000"), width=150)
+                                        click_target = img_src.replace("sz=w400", "sz=w1200")
                                     else:
-                                        st.image(val, width=150)
+                                        click_target = val
+
+                                    st.markdown(f"""
+                                        <a href="{click_target}" target="_blank">
+                                            <img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
+                                        </a>
+                                    """, unsafe_allow_html=True)
                                         
                                 elif "http" in val.lower():
                                     st.link_button(f"🌐 View {col}", url=val)
