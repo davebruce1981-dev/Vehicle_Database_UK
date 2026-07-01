@@ -9,7 +9,7 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="Recovery Specs", layout="centered")
 
 # CENTRALIZED GOOGLE APP SCRIPT BACKEND URL
-GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcjYzl5kmbGMfy90KXxO8b18E-eWYK-Xc9EAOxwROFtDoOQHePYduTXMEfiTarb7Jh/exec"
+GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxtIEPfeIEI6AWFIg410ElbZAwoEULtVLiLLX8TPIpGezjVnJyILHmgZsBoGGcR7IMd2w/exec"
 
 st.markdown("""
     <style>
