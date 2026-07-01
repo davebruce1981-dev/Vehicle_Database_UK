@@ -136,30 +136,49 @@ def main():
             make_options += sorted(df['Make'].dropna().unique().astype(str))
             
         selected_make = st.selectbox("MAKE", options=make_options)
-        filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
-        # 2. SAFE MODEL SELECTION (Bulletproofed against KeyErrors)
+        # Safely compute filtered dataframe by Make
+        if 'Make' in df.columns and selected_make:
+            filtered_by_make = df[df['Make'] == selected_make]
+        else:
+            filtered_by_make = df
+        
+        # 2. DEFINITIVE MODEL SELECTION (Total immunity to KeyErrors)
         model_options = [""]
-        if 'Clean_Model' in filtered_by_make.columns:
-            model_options += sorted(filtered_by_make['Clean_Model'].dropna().unique().astype(str))
-        elif 'Model' in filtered_by_make.columns:
-            filtered_by_make['Clean_Model'] = filtered_by_make['Model'].apply(
-                lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip() if pd.notna(x) else ""
-            )
-            model_options += sorted(filtered_by_make['Clean_Model'].dropna().unique().astype(str))
+        if not filtered_by_make.empty:
+            if 'Clean_Model' in filtered_by_make.columns:
+                model_options += sorted(filtered_by_make['Clean_Model'].dropna().unique().astype(str))
+            elif 'Model' in filtered_by_make.columns:
+                # Direct runtime fallback string generation
+                cleaned_series = filtered_by_make['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip() if pd.notna(x) else "")
+                model_options += sorted(cleaned_series.dropna().unique().astype(str))
 
         selected_model = st.selectbox("MODEL", options=model_options)
-        filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
+        
+        # Safely compute filtered dataframe by Model
+        if not filtered_by_make.empty and selected_model:
+            if 'Clean_Model' in filtered_by_make.columns:
+                filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
+            elif 'Model' in filtered_by_make.columns:
+                temp_clean = filtered_by_make['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip() if pd.notna(x) else "")
+                filtered_by_model = filtered_by_make[temp_clean == selected_model]
+            else:
+                filtered_by_model = filtered_by_make
+        else:
+            filtered_by_model = filtered_by_make
         
         # 3. SAFE YEAR RANGE SELECTION
         year_options = [""]
-        if 'Year Range' in filtered_by_model.columns:
+        if not filtered_by_model.empty and 'Year Range' in filtered_by_model.columns:
             year_options += sorted(filtered_by_model['Year Range'].dropna().unique().astype(str))
             
         selected_year = st.selectbox("YEAR RANGE", options=year_options)
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
-            st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
+            if not filtered_by_model.empty and selected_year and 'Year Range' in filtered_by_model.columns:
+                st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year]
+            else:
+                st.session_state.results = filtered_by_model
             st.session_state.show_results = True
             st.rerun()
             
@@ -305,7 +324,11 @@ def main():
                 st.rerun()
         else:
             for idx, row in results.iterrows():
-                if st.button(f"{row['Make']} | {row['Model']} | {row['Year Range']}", key=f"list_{idx}", use_container_width=True):
+                # Defend listing strings from KeyError lookups
+                r_make = row.get('Make', 'Unknown Make')
+                r_model = row.get('Model', 'Unknown Model')
+                r_year = row.get('Year Range', 'N/A')
+                if st.button(f"{r_make} | {r_model} | {r_year}", key=f"list_{idx}", use_container_width=True):
                     st.session_state.results = results.loc[[idx]]
                     st.rerun()
 
