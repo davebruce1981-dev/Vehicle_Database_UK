@@ -7,7 +7,7 @@ import base64
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="Recovery Specs", layout="centered")
 
-# CENTRALIZED URL
+# CENTRALIZED URL FOR THE GOOGLE APPS SCRIPT
 GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcjYzl5kmbGMfy90KXxO8b18E-eWYK-Xc9EAOxwROFtDoOQHePYduTXMEfiTarb7Jh/exec"
 
 st.markdown("""
@@ -121,7 +121,7 @@ def main():
             st.warning(f"Columns seen by system: {list(df.columns)}")
         return 
 
-    # FIXED: Guaranteed creation of Clean_Model column safely
+    # Guaranteed creation of Clean_Model column safely
     df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip() if pd.notna(x) else "")
     
     if 'show_results' not in st.session_state: st.session_state.show_results = False
@@ -130,14 +130,33 @@ def main():
         show_sidebar_menu()
         st.subheader("Search Specs")
 
-        selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
+        # 1. SAFE MAKE SELECTION
+        make_options = [""]
+        if 'Make' in df.columns:
+            make_options += sorted(df['Make'].dropna().unique().astype(str))
+            
+        selected_make = st.selectbox("MAKE", options=make_options)
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
-        # Safe selection query extraction completely immune to KeyErrors
-        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].dropna().unique().astype(str)))
+        # 2. SAFE MODEL SELECTION (Bulletproofed against KeyErrors)
+        model_options = [""]
+        if 'Clean_Model' in filtered_by_make.columns:
+            model_options += sorted(filtered_by_make['Clean_Model'].dropna().unique().astype(str))
+        elif 'Model' in filtered_by_make.columns:
+            filtered_by_make['Clean_Model'] = filtered_by_make['Model'].apply(
+                lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip() if pd.notna(x) else ""
+            )
+            model_options += sorted(filtered_by_make['Clean_Model'].dropna().unique().astype(str))
+
+        selected_model = st.selectbox("MODEL", options=model_options)
         filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         
-        selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].dropna().unique().astype(str)))
+        # 3. SAFE YEAR RANGE SELECTION
+        year_options = [""]
+        if 'Year Range' in filtered_by_model.columns:
+            year_options += sorted(filtered_by_model['Year Range'].dropna().unique().astype(str))
+            
+        selected_year = st.selectbox("YEAR RANGE", options=year_options)
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
             st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
