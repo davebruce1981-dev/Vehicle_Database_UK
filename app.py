@@ -34,29 +34,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- SELF-HEALING DATA FETCHING ---
-@st.cache_data(ttl=5) # Tightened for debugging live changes
+@st.cache_data(ttl=5) 
 def load_data():
-    # URL 1: Strict target tab URL
     url_with_sheet = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
-    # URL 2: Fallback that grabs whatever the first tab is
     url_fallback = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/export?format=csv"
     
     df = pd.DataFrame()
     try:
-        # Try downloading with explicit tab name first
         df = pd.read_csv(url_with_sheet)
     except:
         pass
         
-    # If URL 1 fails or returns an empty frame without 'Make', use the fallback URL
     if df.empty or not any(x in [str(c).strip().lower() for c in df.columns] for x in ['make', 'brand']):
         try:
             df = pd.read_csv(url_fallback)
         except Exception as e:
             st.error(f"Google Connection Failed entirely: {e}")
-            return pd.DataFrame(columns=['Make', 'Model', 'Year Range'])
+            return pd.DataFrame(columns=['Make', 'Model', 'Year Range', 'Clean_Model'])
             
-    # Clean and match column headers regardless of hidden spaces or casing
     df.columns = df.columns.str.strip()
     rename_dict = {}
     for col in df.columns:
@@ -120,15 +115,14 @@ def main():
 
     df = load_data()
 
-    if 'Make' not in df.columns:
-        st.error("### 🚨 Connection Error: Cannot find the 'Make' column. Check sheet formatting.")
-        # Debug helper showing exactly what columns Python is seeing live
+    if 'Make' not in df.columns or 'Model' not in df.columns:
+        st.error("### 🚨 Connection Error: Cannot locate standard data columns. Check spreadsheet layout.")
         if not df.empty:
-            st.warning(f"Columns found in current tab: {list(df.columns)}")
+            st.warning(f"Columns seen by system: {list(df.columns)}")
         return 
 
-    if 'Model' in df.columns:
-        df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip())
+    # FIXED: Guaranteed creation of Clean_Model column safely
+    df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip() if pd.notna(x) else "")
     
     if 'show_results' not in st.session_state: st.session_state.show_results = False
 
@@ -139,10 +133,11 @@ def main():
         selected_make = st.selectbox("MAKE", options=[""] + sorted(df['Make'].dropna().unique().astype(str)))
         filtered_by_make = df if not selected_make else df[df['Make'] == selected_make]
         
-        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].unique().astype(str)))
+        # Safe selection query extraction completely immune to KeyErrors
+        selected_model = st.selectbox("MODEL", options=[""] + sorted(filtered_by_make['Clean_Model'].dropna().unique().astype(str)))
         filtered_by_model = filtered_by_make if not selected_model else filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
         
-        selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].unique().astype(str)))
+        selected_year = st.selectbox("YEAR RANGE", options=[""] + sorted(filtered_by_model['Year Range'].dropna().unique().astype(str)))
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
             st.session_state.results = filtered_by_model[filtered_by_model['Year Range'] == selected_year] if selected_year else filtered_by_model
@@ -173,12 +168,6 @@ def main():
             st.subheader(f"{record.get('Make', '')} {record.get('Model', '')} | {record.get('Year Range', '')}")
             st.divider()
 
-            st.subheader("General Details")
-            for col in ['Fuel Type', 'Drivetrain', 'Engine']:
-                if col in record.index and is_valid(record[col]):
-                    st.write(f"**{col}:** {record[col]}")
-            st.divider()
-
             sections = {
                 "🔋 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS": ["jack", "torque"], 
@@ -188,7 +177,7 @@ def main():
                 "🚛 HEAVY RECOVERY": ["propshaft", "half-shaft", "half shaft", "towing", "airline connectors", "cab tilt"]
             }
             
-            displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model', 'Heavy Vehicle?'}
+            displayed = {'Make', 'Model', 'Year Range', 'Clean_Model'}
             
             for label, keywords in sections.items():
                 with st.expander(label):
@@ -258,7 +247,7 @@ def main():
                             displayed.add(col)
                     
                     if not matched_any_columns:
-                        st.write("*No active specification columns found for this category in the Google Sheet.*")
+                        st.write("*No active specification columns found for this category.*")
             
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
@@ -276,7 +265,7 @@ def main():
             st.write("")
             with st.expander("📝 Suggest a Spec Update or Correction"):
                 with st.form(f"universal_update_{record.name}"):
-                    up_col = st.selectbox("Which specification field needs updating?", options=[c for c in df.columns if c not in ['Make', 'Model', 'Year Range', 'Clean_Model', 'Heavy Vehicle?']])
+                    up_col = st.selectbox("Which field needs updating?", options=[c for c in df.columns if c not in ['Make', 'Model', 'Year Range', 'Clean_Model']])
                     new_val = st.text_input("Correct information / notes:")
                     if st.form_submit_button("Submit Entry"):
                         try:
@@ -288,9 +277,9 @@ def main():
                                 "column": up_col, 
                                 "newValue": new_val
                             })
-                            st.success("Correction logged for administrative review!")
+                            st.success("Correction logged for review!")
                         except Exception as e:
-                            st.error(f"Submission communication dropped: {e}")
+                            st.error(f"Submission failed: {e}")
 
             if st.button("⬅️ Back to Search"):
                 st.session_state.show_results = False
