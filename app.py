@@ -3,11 +3,12 @@ import pandas as pd
 import re
 import requests
 import base64
+from streamlit_gsheets import GSheetsConnection
 
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="Recovery Specs", layout="centered")
 
-# CENTRALIZED URL
+# CENTRALIZED GOOGLE APP SCRIPT BACKEND URL
 GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcjYzl5kmbGMfy90KXxO8b18E-eWYK-Xc9EAOxwROFtDoOQHePYduTXMEfiTarb7Jh/exec"
 
 st.markdown("""
@@ -33,14 +34,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DATA FETCHING ---
-@st.cache_data(ttl=10) # 10 seconds cache for live building & testing updates
+# --- SECURE DATA FETCHING VIA GOOGLE SERVICE ACCOUNT ---
+@st.cache_data(ttl=10)
 def load_data():
-    url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
     try:
-        df = pd.read_csv(url)
-        df.columns = df.columns.str.strip()
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        # Pulls safely from the specific secure tab shown in Screenshot 2026-07-01 130532.png
+        df = conn.read(worksheet="Vehicle_Library")
         
+        df.columns = df.columns.str.strip()
         rename_dict = {}
         for col in df.columns:
             cleaned = str(col).strip().lower()
@@ -51,16 +53,18 @@ def load_data():
             df = df.rename(columns=rename_dict)
         return df
     except Exception as e:
+        st.error(f"⚠️ Connection issue loading main data: {e}")
         return pd.DataFrame(columns=['Make', 'Model', 'Year Range'])
 
 @st.cache_data(ttl=600)
 def load_sidebar_data():
-    url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Sidebar"
     try:
-        df = pd.read_csv(url)
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        df = conn.read(worksheet="Sidebar")
         df.columns = df.columns.str.strip()
         return df
-    except:
+    except Exception as e:
+        st.error(f"⚠️ Connection issue loading sidebar data: {e}")
         return pd.DataFrame()
 
 def is_valid(val):
@@ -93,7 +97,7 @@ def show_sidebar_menu():
                             st.link_button(f"🔗 {sub_cat}", url=link, use_container_width=True)
                     st.write("") 
     except Exception as e:
-        st.sidebar.error(f"Sidebar error: {e}")
+        st.sidebar.error(f"Sidebar build error: {e}")
 
 # --- MAIN APP ---
 def main():
@@ -105,7 +109,7 @@ def main():
     df = load_data()
 
     if 'Make' not in df.columns:
-        st.error("### 🚨 Connection Error: Cannot find the Vehicle Data sheet tab.")
+        st.error("### 🚨 Connection Error: Cannot process the Vehicle Data sheet database framework.")
         return 
 
     if 'Model' in df.columns:
@@ -160,7 +164,6 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            # Fixed Emoji layout structure
             sections = {
                 "🔋 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS": ["jack", "torque"], 
@@ -172,7 +175,6 @@ def main():
             
             displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model', 'Heavy Vehicle?'}
             
-            # Loop through the core expandable menus
             for label, keywords in sections.items():
                 with st.expander(label):
                     matched_any_columns = False
@@ -192,12 +194,18 @@ def main():
                                         if match:
                                             file_id = match.group(1)
                                             img_src = f"https://drive.google.com/thumbnail?id={file_id}&sz=w400"
+                                    
+                                    if "drive.google.com" in val or "docs.google.com" in val:
+                                        click_target = img_src.replace("sz=w400", "sz=w1200")
+                                    else:
+                                        click_target = val
 
                                     st.markdown(f"""
-                                        <a href="{val}" target="_blank">
+                                        <a href="{click_target}" target="_blank">
                                             <img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
                                         </a>
                                     """, unsafe_allow_html=True)
+                                        
                                 elif "http" in val.lower():
                                     st.link_button(f"🌐 View {col}", url=val)
                                 else:
@@ -205,7 +213,6 @@ def main():
                             else:
                                 st.write("*No data yet*")
                                 if "photo" in col.lower():
-                                    # Unique key generation using row index and sanitized column strings
                                     clean_col = re.sub(r'[^a-zA-Z0-9]', '', col)
                                     action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{clean_col}_{record.name}")
                                     img_file = st.file_uploader(f"Choose file", type=['jpg', 'png', 'jpeg'], key=f"uploader_{clean_col}_{record.name}") if action == "Upload Photo" else st.camera_input(f"Camera", key=f"camera_{clean_col}_{record.name}")
@@ -213,8 +220,9 @@ def main():
                                         bytes_data = img_file.getvalue()
                                         base64_str = base64.b64encode(bytes_data).decode('utf-8')
                                         try:
-                                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record['Make'], "model": record['Model'], "column": col, "image": base64_str})
-                                            st.success("Uploaded successfully!")
+                                            # Drops records securely into Pending_Submissions queue tab via background scripting engine
+                                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record['Make'], "model": record['Model'], "year": record['Year Range'], "column": col, "image": base64_str})
+                                            st.success("Uploaded successfully! Submitted to admin spreadsheet tab for review.")
                                         except Exception as e:
                                             st.error(f"Upload failed: {e}")
                                 else:
@@ -223,8 +231,8 @@ def main():
                                         new_val = st.text_input(f"Add info")
                                         if st.form_submit_button("Submit"):
                                             try:
-                                                requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "column": col, "newValue": new_val})
-                                                st.success("Submitted successfully!")
+                                                requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "year": record['Year Range'], "column": col, "newValue": new_val})
+                                                st.success("Submitted successfully! Routing data to verification sheet queue.")
                                             except Exception as e:
                                                 st.error(f"Submission failed: {e}")
                             displayed.add(col)
@@ -232,7 +240,6 @@ def main():
                     if not matched_any_columns:
                         st.write("*No active specification columns found for this category in the Google Sheet.*")
             
-            # Positioned perfectly below the core list expanders
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
@@ -253,8 +260,8 @@ def main():
                     new_val = st.text_input("Correct information / notes:")
                     if st.form_submit_button("Submit Entry"):
                         try:
-                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "column": up_col, "newValue": new_val})
-                            st.success("Correction logged for administrative review!")
+                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "year": record['Year Range'], "column": up_col, "newValue": new_val})
+                            st.success("Correction logged for administrative verification review!")
                         except Exception as e:
                             st.error(f"Submission communication dropped: {e}")
 
