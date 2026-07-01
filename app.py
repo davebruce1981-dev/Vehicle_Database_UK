@@ -3,13 +3,12 @@ import pandas as pd
 import re
 import requests
 import base64
-from streamlit_gsheets import GSheetsConnection
 
 # --- CONFIG & STYLING ---
 st.set_page_config(page_title="Recovery Specs", layout="centered")
 
-# CENTRALIZED GOOGLE APP SCRIPT BACKEND URL
-GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxtIEPfeIEI6AWFIg410ElbZAwoEULtVLiLLX8TPIpGezjVnJyILHmgZsBoGGcR7IMd2w/exec"
+# CENTRALIZED URL
+GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcjYzl5kmbGMfy90KXxO8b18E-eWYK-Xc9EAOxwROFtDoOQHePYduTXMEfiTarb7Jh/exec"
 
 st.markdown("""
     <style>
@@ -34,15 +33,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SECURE DATA FETCHING VIA GOOGLE SERVICE ACCOUNT ---
-@st.cache_data(ttl=10)
+# --- DATA FETCHING ---
+@st.cache_data(ttl=10) # 10 seconds cache for live building & testing updates
 def load_data():
+    url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
     try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        # Pulls safely from the specific secure tab shown in Screenshot 2026-07-01 130532.png
-        df = conn.read(worksheet="Vehicle_Library")
-        
+        df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
+        
         rename_dict = {}
         for col in df.columns:
             cleaned = str(col).strip().lower()
@@ -53,18 +51,16 @@ def load_data():
             df = df.rename(columns=rename_dict)
         return df
     except Exception as e:
-        st.error(f"⚠️ Connection issue loading main data: {e}")
         return pd.DataFrame(columns=['Make', 'Model', 'Year Range'])
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=600)
 def load_sidebar_data():
+    url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Sidebar"
     try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read(worksheet="Sidebar")
+        df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
         return df
-    except Exception as e:
-        st.error(f"⚠️ Connection issue loading sidebar data: {e}")
+    except:
         return pd.DataFrame()
 
 def is_valid(val):
@@ -97,7 +93,7 @@ def show_sidebar_menu():
                             st.link_button(f"🔗 {sub_cat}", url=link, use_container_width=True)
                     st.write("") 
     except Exception as e:
-        st.sidebar.error(f"Sidebar build error: {e}")
+        st.sidebar.error(f"Sidebar error: {e}")
 
 # --- MAIN APP ---
 def main():
@@ -109,7 +105,7 @@ def main():
     df = load_data()
 
     if 'Make' not in df.columns:
-        st.error("### 🚨 Connection Error: Cannot process the Vehicle Data sheet database framework.")
+        st.error("### 🚨 Connection Error: Cannot find the Vehicle Data sheet tab.")
         return 
 
     if 'Model' in df.columns:
@@ -164,6 +160,7 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
+            # Fixed Emoji layout structure
             sections = {
                 "🔋 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS": ["jack", "torque"], 
@@ -175,6 +172,7 @@ def main():
             
             displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model', 'Heavy Vehicle?'}
             
+            # Loop through the core expandable menus
             for label, keywords in sections.items():
                 with st.expander(label):
                     matched_any_columns = False
@@ -194,18 +192,12 @@ def main():
                                         if match:
                                             file_id = match.group(1)
                                             img_src = f"https://drive.google.com/thumbnail?id={file_id}&sz=w400"
-                                    
-                                    if "drive.google.com" in val or "docs.google.com" in val:
-                                        click_target = img_src.replace("sz=w400", "sz=w1200")
-                                    else:
-                                        click_target = val
 
                                     st.markdown(f"""
-                                        <a href="{click_target}" target="_blank">
+                                        <a href="{val}" target="_blank">
                                             <img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
                                         </a>
                                     """, unsafe_allow_html=True)
-                                        
                                 elif "http" in val.lower():
                                     st.link_button(f"🌐 View {col}", url=val)
                                 else:
@@ -213,26 +205,38 @@ def main():
                             else:
                                 st.write("*No data yet*")
                                 if "photo" in col.lower():
-                                    clean_col = re.sub(r'[^a-zA-Z0-9]', '', col)
-                                    action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{clean_col}_{record.name}")
-                                    img_file = st.file_uploader(f"Choose file", type=['jpg', 'png', 'jpeg'], key=f"uploader_{clean_col}_{record.name}") if action == "Upload Photo" else st.camera_input(f"Camera", key=f"camera_{clean_col}_{record.name}")
-                                    if img_file and st.button(f"Submit Photo for {col}", key=f"btn_{clean_col}_{record.name}"):
+                                    action = st.radio(f"Action for {col}:", ["Upload Photo", "Take New Photo"], key=f"radio_{col}_{record.name}")
+                                    img_file = st.file_uploader(f"Choose file", type=['jpg', 'png', 'jpeg'], key=f"uploader_{col}_{record.name}") if action == "Upload Photo" else st.camera_input(f"Camera", key=f"camera_{col}_{record.name}")
+                                    if img_file and st.button(f"Submit Photo for {col}", key=f"btn_{col}_{record.name}"):
                                         bytes_data = img_file.getvalue()
                                         base64_str = base64.b64encode(bytes_data).decode('utf-8')
                                         try:
-                                            # Drops records securely into Pending_Submissions queue tab via background scripting engine
-                                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "photo", "make": record['Make'], "model": record['Model'], "year": record['Year Range'], "column": col, "image": base64_str})
-                                            st.success("Uploaded successfully! Submitted to admin spreadsheet tab for review.")
+                                            # ADDED 'year' payload tracking context so lookup matches perfectly
+                                            requests.post(GOOGLE_SCRIPT_URL, json={
+                                                "type": "photo", 
+                                                "make": record['Make'], 
+                                                "model": record['Model'], 
+                                                "year": record.get('Year Range', ''),
+                                                "column": col, 
+                                                "image": base64_str
+                                            })
+                                            st.success("Uploaded successfully!")
                                         except Exception as e:
                                             st.error(f"Upload failed: {e}")
                                 else:
-                                    clean_col = re.sub(r'[^a-zA-Z0-9]', '', col)
-                                    with st.form(f"form_{clean_col}_{record.name}"):
-                                        new_val = st.text_input(f"Add info")
+                                    with st.form(f"form_{col}_{record.name}"):
+                                        new_val = st.text_input("Add info")
                                         if st.form_submit_button("Submit"):
                                             try:
-                                                requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "year": record['Year Range'], "column": col, "newValue": new_val})
-                                                st.success("Submitted successfully! Routing data to verification sheet queue.")
+                                                requests.post(GOOGLE_SCRIPT_URL, json={
+                                                    "type": "update", 
+                                                    "make": record['Make'], 
+                                                    "model": record['Model'], 
+                                                    "year": record.get('Year Range', ''),
+                                                    "column": col, 
+                                                    "newValue": new_val
+                                                })
+                                                st.success("Submitted successfully!")
                                             except Exception as e:
                                                 st.error(f"Submission failed: {e}")
                             displayed.add(col)
@@ -240,6 +244,7 @@ def main():
                     if not matched_any_columns:
                         st.write("*No active specification columns found for this category in the Google Sheet.*")
             
+            # Positioned perfectly below the core list expanders
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
@@ -260,8 +265,15 @@ def main():
                     new_val = st.text_input("Correct information / notes:")
                     if st.form_submit_button("Submit Entry"):
                         try:
-                            requests.post(GOOGLE_SCRIPT_URL, json={"type": "update", "make": record['Make'], "model": record['Model'], "year": record['Year Range'], "column": up_col, "newValue": new_val})
-                            st.success("Correction logged for administrative verification review!")
+                            requests.post(GOOGLE_SCRIPT_URL, json={
+                                "type": "update", 
+                                "make": record['Make'], 
+                                "model": record['Model'], 
+                                "year": record.get('Year Range', ''),
+                                "column": up_col, 
+                                "newValue": new_val
+                            })
+                            st.success("Correction logged for administrative review!")
                         except Exception as e:
                             st.error(f"Submission communication dropped: {e}")
 
@@ -276,3 +288,178 @@ def main():
 
 if __name__ == "__main__":
     main()
+2. Complete Google Apps Script Code (Code.gs)
+Clear your Google Apps Script workspace and paste this script. It uses your folder ID 1HeGgaV3ZLcTXqXJyXhfUEbo9olvvO4id from the address list and creates verification tasks inside Pending_Updates:
+
+JavaScript
+// --- 1. HANDLE SUBMISSIONS FROM STREAMLIT + HARDCODED FOLDER UPLOADS + EMAIL ALERTS ---
+function doPost(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var pendingSheet = ss.getSheetByName("Pending_Updates");
+  
+  if (!pendingSheet) {
+    pendingSheet = ss.insertSheet("Pending_Updates");
+    pendingSheet.appendRow(["Time Stamp", "Type", "Make", "Model", "Info", "Link", "Action"]);
+  }
+  
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var timestamp = new Date();
+    
+    var typeLabel = "";
+    var makeLabel = data.make || "";
+    var modelLabel = data.model || "";
+    var infoLabel = data.column || "";
+    var valueLabel = "";
+    
+    // CASE A: NEW VEHICLE CREATIONS
+    if (data.type === "new_request") {
+      typeLabel = "New Vehicle Request";
+      infoLabel = "NEW VEHICLE REQUEST";
+      valueLabel = data.details || "";
+      
+      // Save data, leaving room for Year inside the Info tracking column if available
+      if (data.year) { infoLabel += " (" + data.year + ")"; }
+      pendingSheet.appendRow([timestamp, typeLabel, makeLabel, modelLabel, infoLabel, valueLabel, "Select Action"]);
+    } 
+    
+    // CASE B: STREAMLIT FIELD PHOTO IMAGES
+    else if (data.type === "photo") {
+      typeLabel = "Photo Upload";
+      
+      if (data.image) {
+        // Hardcoded path directly to your target vehicle_uploads folder address
+        var targetFolder = DriveApp.getFolderById("1HeGgaV3ZLcTXqXJyXhfUEbo9olvvO4id");
+        
+        var contentType = "image/jpeg";
+        var decodedImg = Utilities.base64Decode(data.image);
+        var filename = makeLabel + "_" + modelLabel + "_" + infoLabel.replace(/\s+/g, '_') + "_" + timestamp.getTime() + ".jpg";
+        var blob = Utilities.newBlob(decodedImg, contentType, filename);
+        
+        // Save file directly inside folder and update safety configurations
+        var file = targetFolder.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        
+        // Output url drops cleanly into Column F (Link)
+        valueLabel = file.getUrl();
+      } else {
+        valueLabel = "No image file received.";
+      }
+      
+      // Append the year right into the info column text so onEdit lookup handles variations
+      if (data.year) { infoLabel += " [" + data.year + "]"; }
+      pendingSheet.appendRow([timestamp, typeLabel, makeLabel, modelLabel, infoLabel, valueLabel, "Select Action"]);
+    } 
+    
+    // CASE C: SPEC TEXT UPDATES
+    else if (data.type === "update") {
+      typeLabel = "Text Update";
+      valueLabel = data.newValue || "";
+      
+      if (data.year) { infoLabel += " [" + data.year + "]"; }
+      pendingSheet.appendRow([timestamp, typeLabel, makeLabel, modelLabel, infoLabel, valueLabel, "Select Action"]);
+    }
+    
+    // --- AUTOMATED EMAIL ENGINE ---
+    var myEmail = "your-profile@outlook.com"; 
+    var emailSubject = "🚨 New Driver Submission: " + makeLabel + " " + modelLabel;
+    var emailBody = "Hello,\n\nA driver has sent an entry requiring review in your Pending_Updates tab.\n\nOpen spreadsheet:\n" + ss.getUrl();
+    MailApp.sendEmail(myEmail, emailSubject, emailBody);
+    
+    return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// --- 2. AUTOMATE ACCEPT / REJECT TRANSFERS WATCHING PENDING_UPDATES ---
+function onEdit(e) {
+  var sheet = e.source.getActiveSheet();
+  if (sheet.getName() !== "Pending_Updates") return;
+  
+  var range = e.range;
+  var col = range.getColumn();
+  var row = range.getRow();
+  
+  // Monitors Column G (7th column) for admin confirmations
+  if (col !== 7 || row === 1) return; 
+  
+  var actionValue = range.getValue();
+  if (actionValue !== "Accept" && actionValue !== "Reject") return;
+  
+  var rowData = sheet.getRange(row, 1, 1, 6).getValues()[0];
+  var make = String(rowData[2] || "").trim();
+  var model = String(rowData[3] || "").trim();
+  var rawInfo = String(rowData[4] || "").trim();
+  var newValue = rowData[5];
+  
+  // Extract clean column header name and the year constraint string out of bracket logs
+  var columnHeader = rawInfo.split(" [")[0].split(" (")[0];
+  var yearConstraint = "";
+  var yearMatch = rawInfo.match(/\[(.*?)\]/);
+  if (yearMatch) { yearConstraint = yearMatch[1].trim(); }
+  
+  if (actionValue === "Accept") {
+    var mainSheet = e.source.getSheetByName("Vehicle_Library");
+    if (mainSheet) {
+      
+      if (columnHeader === "NEW VEHICLE REQUEST") {
+        var reqYear = "";
+        var reqMatch = rawInfo.match(/\((.*?)\)/);
+        if (reqMatch) { reqYear = reqMatch[1].trim(); }
+        mainSheet.appendRow([make, model, reqYear, "", "", "", "", newValue]);
+      } else {
+        var mainData = mainSheet.getDataRange().getValues();
+        var headers = mainData[0];
+        
+        var targetColIdx = -1;
+        for (var h = 0; h < headers.length; h++) {
+          if (String(headers[h]).trim().toLowerCase() === columnHeader.toLowerCase()) {
+            targetColIdx = h + 1;
+            break;
+          }
+        }
+        
+        // Spellcheck lookup rule matches (e.g. ODB versus OBD Link)
+        if (targetColIdx === -1) {
+          var cleanHeader = columnHeader.toLowerCase().replace(/[^a-z0-9]/g, "");
+          for (var h = 0; h < headers.length; h++) {
+            var cleanMainHeader = String(headers[h]).toLowerCase().replace(/[^a-z0-9]/g, "");
+            if (cleanMainHeader === cleanHeader || 
+                (cleanHeader === "odbphoto" && cleanMainHeader === "obdphotolink") ||
+                (cleanHeader === "jackingpointphoto" && cleanMainHeader === "jackingpointsphoto")) {
+              targetColIdx = h + 1;
+              break;
+            }
+          }
+        }
+        
+        if (targetColIdx > 0) {
+          for (var i = 1; i < mainData.length; i++) {
+            var mMake = String(mainData[i][0] || "").trim();
+            var mModel = String(mainData[i][1] || "").trim();
+            var mYear = String(mainData[i][2] || "").trim();
+            
+            // Step 1: Check basic names
+            var isVehicleMatch = (mMake.toLowerCase() === make.toLowerCase() && 
+                                 (mModel.toLowerCase() === model.toLowerCase() || model.toLowerCase().includes(mModel.toLowerCase())));
+            
+            // Step 2: Validate year constraints if provided
+            if (isVehicleMatch && yearConstraint !== "") {
+              if (mYear !== yearConstraint) {
+                continue; // Skip rows that don't match the year range
+              }
+            }
+            
+            if (isVehicleMatch) {
+              mainSheet.getRange(i + 1, targetColIdx).setValue(newValue);
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  sheet.deleteRow(row);
+}
