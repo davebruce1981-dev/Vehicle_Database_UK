@@ -132,30 +132,29 @@ def main():
 
         # 1. SAFE MAKE SELECTION
         make_options = [""]
-        if 'Make' in df.columns:
+        if 'Make' in df.columns and not df.empty:
             make_options += sorted(df['Make'].dropna().unique().astype(str))
             
         selected_make = st.selectbox("MAKE", options=make_options)
         
-        # Safely compute filtered dataframe by Make
-        if 'Make' in df.columns and selected_make:
+        # Filter rows by Make safely
+        if 'Make' in df.columns and selected_make and not df.empty:
             filtered_by_make = df[df['Make'] == selected_make]
         else:
             filtered_by_make = df
         
-        # 2. DEFINITIVE MODEL SELECTION (Total immunity to KeyErrors)
+        # 2. THE ULTIMATE KEYERROR SHIELD FOR MODEL
         model_options = [""]
         if not filtered_by_make.empty:
             if 'Clean_Model' in filtered_by_make.columns:
                 model_options += sorted(filtered_by_make['Clean_Model'].dropna().unique().astype(str))
             elif 'Model' in filtered_by_make.columns:
-                # Direct runtime fallback string generation
-                cleaned_series = filtered_by_make['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip() if pd.notna(x) else "")
-                model_options += sorted(cleaned_series.dropna().unique().astype(str))
+                fallback_clean = filtered_by_make['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip() if pd.notna(x) else "")
+                model_options += sorted(fallback_clean.dropna().unique().astype(str))
 
         selected_model = st.selectbox("MODEL", options=model_options)
         
-        # Safely compute filtered dataframe by Model
+        # Filter rows by Model safely
         if not filtered_by_make.empty and selected_model:
             if 'Clean_Model' in filtered_by_make.columns:
                 filtered_by_model = filtered_by_make[filtered_by_make['Clean_Model'] == selected_model]
@@ -324,7 +323,6 @@ def main():
                 st.rerun()
         else:
             for idx, row in results.iterrows():
-                # Defend listing strings from KeyError lookups
                 r_make = row.get('Make', 'Unknown Make')
                 r_model = row.get('Model', 'Unknown Model')
                 r_year = row.get('Year Range', 'N/A')
