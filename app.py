@@ -33,25 +33,41 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DATA FETCHING ---
-@st.cache_data(ttl=10) # 10 seconds cache for live building & testing updates
+# --- SELF-HEALING DATA FETCHING ---
+@st.cache_data(ttl=5) # Tightened for debugging live changes
 def load_data():
-    url = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
+    # URL 1: Strict target tab URL
+    url_with_sheet = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
+    # URL 2: Fallback that grabs whatever the first tab is
+    url_fallback = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/export?format=csv"
+    
+    df = pd.DataFrame()
     try:
-        df = pd.read_csv(url)
-        df.columns = df.columns.str.strip()
+        # Try downloading with explicit tab name first
+        df = pd.read_csv(url_with_sheet)
+    except:
+        pass
         
-        rename_dict = {}
-        for col in df.columns:
-            cleaned = str(col).strip().lower()
-            if cleaned == 'make': rename_dict[col] = 'Make'
-            elif cleaned == 'model': rename_dict[col] = 'Model'
-            elif cleaned == 'year range': rename_dict[col] = 'Year Range'
-        if rename_dict:
-            df = df.rename(columns=rename_dict)
-        return df
-    except Exception as e:
-        return pd.DataFrame(columns=['Make', 'Model', 'Year Range'])
+    # If URL 1 fails or returns an empty frame without 'Make', use the fallback URL
+    if df.empty or not any(x in [str(c).strip().lower() for c in df.columns] for x in ['make', 'brand']):
+        try:
+            df = pd.read_csv(url_fallback)
+        except Exception as e:
+            st.error(f"Google Connection Failed entirely: {e}")
+            return pd.DataFrame(columns=['Make', 'Model', 'Year Range'])
+            
+    # Clean and match column headers regardless of hidden spaces or casing
+    df.columns = df.columns.str.strip()
+    rename_dict = {}
+    for col in df.columns:
+        cleaned = str(col).strip().lower()
+        if cleaned == 'make': rename_dict[col] = 'Make'
+        elif cleaned == 'model': rename_dict[col] = 'Model'
+        elif cleaned == 'year range': rename_dict[col] = 'Year Range'
+    if rename_dict:
+        df = df.rename(columns=rename_dict)
+        
+    return df
 
 @st.cache_data(ttl=600)
 def load_sidebar_data():
@@ -105,7 +121,10 @@ def main():
     df = load_data()
 
     if 'Make' not in df.columns:
-        st.error("### 🚨 Connection Error: Cannot find the Vehicle Data sheet tab.")
+        st.error("### 🚨 Connection Error: Cannot find the 'Make' column. Check sheet formatting.")
+        # Debug helper showing exactly what columns Python is seeing live
+        if not df.empty:
+            st.warning(f"Columns found in current tab: {list(df.columns)}")
         return 
 
     if 'Model' in df.columns:
@@ -160,7 +179,6 @@ def main():
                     st.write(f"**{col}:** {record[col]}")
             st.divider()
 
-            # Fixed Emoji layout structure
             sections = {
                 "🔋 BATTERY DETAILS": ["battery"], 
                 "🏋️ JACKING POINTS": ["jack", "torque"], 
@@ -172,7 +190,6 @@ def main():
             
             displayed = {'Make', 'Model', 'Year Range', 'Fuel Type', 'Drivetrain', 'Engine', 'Clean_Model', 'Heavy Vehicle?'}
             
-            # Loop through the core expandable menus
             for label, keywords in sections.items():
                 with st.expander(label):
                     matched_any_columns = False
@@ -243,7 +260,6 @@ def main():
                     if not matched_any_columns:
                         st.write("*No active specification columns found for this category in the Google Sheet.*")
             
-            # Positioned perfectly below the core list expanders
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
