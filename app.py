@@ -56,7 +56,7 @@ def load_data():
         st.error(f"⚠️ Connection issue loading main data: {e}")
         return pd.DataFrame(columns=['Make', 'Model', 'Year Range'])
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=10)
 def load_sidebar_data():
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
