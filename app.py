@@ -288,8 +288,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-2. Complete Google Apps Script Code (Code.gs)
-Clear your Google Apps Script workspace and paste this script. It uses your folder ID 1HeGgaV3ZLcTXqXJyXhfUEbo9olvvO4id from the address list and creates verification tasks inside Pending_Updates:
 
 JavaScript
 // --- 1. HANDLE SUBMISSIONS FROM STREAMLIT + HARDCODED FOLDER UPLOADS + EMAIL ALERTS ---
