@@ -12,38 +12,39 @@ GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcjYzl5kmbGMfy90KX
 
 st.markdown("""
     <style>
-    /* Global Reset to ensure full viewport usage */
+    /* Global Reset */
     html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; }
 
-    /* Top Hazard Tape */
-    body::before {
-        content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 20px; z-index: 999999;
-        background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
+    /* Single, Continuous Hazard Tape Border */
+    body::after {
+        content: "";
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 999999;
+        pointer-events: none; /* CRITICAL: Lets you click the search box even if the tape overlaps */
+        padding: 15px; /* Thickness of the tape */
+        background: repeating-linear-gradient(
+            -45deg, 
+            #000000, 
+            #000000 20px, 
+            #f6782a 20px, 
+            #f6782a 40px
+        );
+        /* Mask cuts out the center perfectly so stripes flow around the corners */
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+    }
+
+    /* Push all app content inward to prevent visual overlap */
+    [data-testid="stAppViewBlockContainer"] {
+        padding-top: 60px !important;
+        padding-bottom: 60px !important;
+        padding-left: 30px !important;
+        padding-right: 30px !important;
     }
     
-    /* Bottom Hazard Tape */
-    body::after {
-        content: ""; position: fixed; bottom: 0; left: 0; width: 100%; height: 20px; z-index: 999999;
-        background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
-    }
-
-    /* Left Hazard Tape */
-    .stApp::before {
-        content: ""; position: fixed; top: 0; left: 0; width: 20px; height: 100%; z-index: 999999;
-        background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
-    }
-
-    /* Right Hazard Tape */
-    .stApp::after {
-        content: ""; position: fixed; top: 0; right: 0; width: 20px; height: 100%; z-index: 999999;
-        background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
-    }
-
-    /* Adjust main container to prevent content overlap on all 4 sides */
-    .stApp { 
-        background-color: #000000 !important; 
-        padding: 40px 40px !important; 
-    }
+    .stApp { background-color: #000000 !important; }
     
     h1, h2, h3, h4, p, label { color: #ffffff !important; }
     
@@ -55,7 +56,8 @@ st.markdown("""
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     
-    /* --- MAGIC HAMBURGER CSS --- */
+    /* Hamburger Menu - Bring to absolute front so it can be clicked */
+    [data-testid="collapsedControl"] { z-index: 9999999 !important; }
     [data-testid="collapsedControl"] svg { display: none !important; }
     [data-testid="collapsedControl"]::after {
         content: "☰";
