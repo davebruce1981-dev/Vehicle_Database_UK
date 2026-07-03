@@ -12,37 +12,47 @@ GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcjYzl5kmbGMfy90KX
 
 st.markdown("""
     <style>
-    /* Hazard Tape Border */
+    /* Global Reset to ensure full viewport usage */
+    html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; }
+
+    /* Top Hazard Tape */
     body::before {
         content: "";
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
-        height: 15px;
-        z-index: 9999;
+        height: 20px;
+        z-index: 999999;
         background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
     }
+    
+    /* Bottom Hazard Tape */
     body::after {
         content: "";
         position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
-        height: 15px;
-        z-index: 9999;
+        height: 20px;
+        z-index: 999999;
         background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
     }
+
+    /* Adjust main container to prevent content overlap */
     .stApp { 
         background-color: #000000 !important; 
-        padding-top: 25px; 
-        padding-bottom: 25px; 
+        padding-top: 40px !important; 
+        padding-bottom: 40px !important; 
     }
+    
     h1, h2, h3, h4, p, label { color: #ffffff !important; }
+    
     div[data-testid="stVerticalBlock"] div.stButton > button, 
     div[data-testid="stFormSubmitButton"] button { 
         background-color: #f6782a !important; color: white !important; width: 100%; font-weight: bold; border: none !important;
     }
+    
     .result-header { font-size: 1.15em !important; color: #f6782a !important; font-weight: bold; margin-bottom: 2px; }
     .stExpander { border: 1px solid #333333 !important; background-color: #111111 !important; margin-bottom: 10px; }
     
