@@ -17,33 +17,32 @@ st.markdown("""
 
     /* Top Hazard Tape */
     body::before {
-        content: "";
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 20px;
-        z-index: 999999;
+        content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 20px; z-index: 999999;
         background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
     }
     
     /* Bottom Hazard Tape */
     body::after {
-        content: "";
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 20px;
-        z-index: 999999;
+        content: ""; position: fixed; bottom: 0; left: 0; width: 100%; height: 20px; z-index: 999999;
         background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
     }
 
-    /* Adjust main container to prevent content overlap */
+    /* Left Hazard Tape */
+    .stApp::before {
+        content: ""; position: fixed; top: 0; left: 0; width: 20px; height: 100%; z-index: 999999;
+        background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
+    }
+
+    /* Right Hazard Tape */
+    .stApp::after {
+        content: ""; position: fixed; top: 0; right: 0; width: 20px; height: 100%; z-index: 999999;
+        background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
+    }
+
+    /* Adjust main container to prevent content overlap on all 4 sides */
     .stApp { 
         background-color: #000000 !important; 
-        padding-top: 40px !important; 
-        padding-bottom: 40px !important; 
+        padding: 40px 40px !important; 
     }
     
     h1, h2, h3, h4, p, label { color: #ffffff !important; }
