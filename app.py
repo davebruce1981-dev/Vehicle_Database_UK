@@ -1,3 +1,4 @@
+Python
 import streamlit as st
 import pandas as pd
 import re
@@ -12,7 +13,32 @@ GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcjYzl5kmbGMfy90KX
 
 st.markdown("""
     <style>
-    .stApp { background-color: #000000 !important; }
+    /* Hazard Tape Border */
+    body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 15px;
+        z-index: 9999;
+        background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
+    }
+    body::after {
+        content: "";
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 15px;
+        z-index: 9999;
+        background: repeating-linear-gradient(45deg, #000000, #000000 20px, #f6782a 20px, #f6782a 40px);
+    }
+    .stApp { 
+        background-color: #000000 !important; 
+        padding-top: 25px; 
+        padding-bottom: 25px; 
+    }
     h1, h2, h3, h4, p, label { color: #ffffff !important; }
     div[data-testid="stVerticalBlock"] div.stButton > button, 
     div[data-testid="stFormSubmitButton"] button { 
