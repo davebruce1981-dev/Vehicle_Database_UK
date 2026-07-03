@@ -22,7 +22,7 @@ st.markdown("""
         top: 0; left: 0; right: 0; bottom: 0;
         z-index: 999999;
         pointer-events: none; /* CRITICAL: Lets you click the search box even if the tape overlaps */
-        padding: 15px; /* Thickness of the tape */
+        padding: 8px; /* Thickness of the tape */
         background: repeating-linear-gradient(
             -45deg, 
             #000000, 
