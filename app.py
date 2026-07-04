@@ -74,20 +74,20 @@ st.markdown("""
 def load_data():
     url_with_sheet = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/gviz/tq?tqx=out:csv&sheet=Vehicle_Library"
     url_fallback = "https://docs.google.com/spreadsheets/d/1T7k-8tjbsZd0mpcfFzKpb3yisaxwLmOpoJeGQXXYc8M/export?format=csv"
-    
+
     df = pd.DataFrame()
     try:
         df = pd.read_csv(url_with_sheet)
     except:
         pass
-        
+
     if df.empty or not any(x in [str(c).strip().lower() for c in df.columns] for x in ['make', 'brand']):
         try:
             df = pd.read_csv(url_fallback)
         except Exception as e:
             st.error(f"Google Connection Failed entirely: {e}")
             return pd.DataFrame(columns=['Make', 'Model', 'Year Range', 'Clean_Model'])
-            
+
     df.columns = df.columns.str.strip()
     rename_dict = {}
     for col in df.columns:
@@ -97,7 +97,7 @@ def load_data():
         elif cleaned == 'year range': rename_dict[col] = 'Year Range'
     if rename_dict:
         df = df.rename(columns=rename_dict)
-        
+
     return df
 
 @st.cache_data(ttl=600)
@@ -122,10 +122,10 @@ def show_sidebar_menu():
         with st.sidebar:
             st.header("📚 Generic Resources")
             st.divider()
-            
+
             if side_df.empty or not all(col in side_df.columns for col in ['Category', 'Sub-Category', 'Link']):
                 return
-            
+
             categories = side_df['Category'].dropna().unique()
             for cat in categories:
                 if is_valid(cat):
@@ -159,7 +159,7 @@ def main():
 
     # Guaranteed creation of Clean_Model column safely
     df['Clean_Model'] = df['Model'].apply(lambda x: re.sub(r'\s*\(.*?\)', '', str(x)).strip() if pd.notna(x) else "")
-    
+
     if 'show_results' not in st.session_state: st.session_state.show_results = False
 
     if not st.session_state.show_results:
@@ -170,15 +170,15 @@ def main():
         make_options = [""]
         if 'Make' in df.columns and not df.empty:
             make_options += sorted(df['Make'].dropna().unique().astype(str))
-            
+
         selected_make = st.selectbox("MAKE", options=make_options)
-        
+
         # Filter rows by Make safely
         if 'Make' in df.columns and selected_make and not df.empty:
             filtered_by_make = df[df['Make'] == selected_make]
         else:
             filtered_by_make = df
-        
+
         # 2. THE ULTIMATE KEYERROR SHIELD FOR MODEL
         model_options = [""]
         if not filtered_by_make.empty:
@@ -189,7 +189,7 @@ def main():
                 model_options += sorted(fallback_clean.dropna().unique().astype(str))
 
         selected_model = st.selectbox("MODEL", options=model_options)
-        
+
         # Filter rows by Model safely
         if not filtered_by_make.empty and selected_model:
             if 'Clean_Model' in filtered_by_make.columns:
@@ -201,12 +201,12 @@ def main():
                 filtered_by_model = filtered_by_make
         else:
             filtered_by_model = filtered_by_make
-        
+
         # 3. SAFE YEAR RANGE SELECTION
         year_options = [""]
         if not filtered_by_model.empty and 'Year Range' in filtered_by_model.columns:
             year_options += sorted(filtered_by_model['Year Range'].dropna().unique().astype(str))
-            
+
         selected_year = st.selectbox("YEAR RANGE", options=year_options)
 
         if st.button("🔍 SEARCH SPECS", use_container_width=True):
@@ -216,7 +216,7 @@ def main():
                 st.session_state.results = filtered_by_model
             st.session_state.show_results = True
             st.rerun()
-            
+
         st.divider()
 
         with st.expander("➕ Report Missing Vehicle"):
@@ -235,11 +235,26 @@ def main():
     else:
         st.markdown("<style>[data-testid='collapsedControl'] { display: none !important; }</style>", unsafe_allow_html=True)
         results = st.session_state.results
-        
+
         if len(results) == 1:
             record = results.iloc[0]
             st.subheader(f"{record.get('Make', '')} {record.get('Model', '')} | {record.get('Year Range', '')}")
             st.divider()
+
+            # --- DYNAMIC TOP SPECIFICATIONS PANEL ---
+            displayed = {'Make', 'Model', 'Year Range', 'Clean_Model'}
+            has_top_specs = False
+            
+            # Programmatically find and show Fuel Type & Drivetrain at the very top
+            for col in record.index:
+                if col.lower().strip() in ['fuel type', 'drivetrain']:
+                    if is_valid(record[col]):
+                        st.write(f"**{col}:** {record[col]}")
+                        has_top_specs = True
+                    displayed.add(col) # Prevent repeating in 'Other Specifications'
+            
+            if has_top_specs:
+                st.divider()
 
             sections = {
                 "🔋 BATTERY DETAILS": ["battery"], 
@@ -249,20 +264,18 @@ def main():
                 "⚙️ GEAR NEUTRAL OVERRIDE": ["automatic gear", "neutral override"],
                 "🚛 HEAVY RECOVERY": ["propshaft", "half-shaft", "half shaft", "towing", "airline connectors", "cab tilt"]
             }
-            
-            displayed = {'Make', 'Model', 'Year Range', 'Clean_Model'}
-            
+
             for label, keywords in sections.items():
                 with st.expander(label):
                     matched_any_columns = False
-                    
+
                     for col in record.index:
                         if any(k in col.lower() for k in keywords) and col not in displayed:
                             matched_any_columns = True
                             val = str(record[col])
-                            
+
                             st.markdown(f'<p class="result-header">{col}</p>', unsafe_allow_html=True)
-                            
+
                             if is_valid(val):
                                 if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
                                     img_src = val
@@ -318,10 +331,10 @@ def main():
                                             except Exception as e:
                                                 st.error(f"Submission failed: {e}")
                             displayed.add(col)
-                    
+
                     if not matched_any_columns:
                         st.write("*No active specification columns found for this category.*")
-            
+
             with st.expander("🧩 OTHER SPECIFICATIONS"):
                 found_other = False
                 for col in record.index:
@@ -334,7 +347,7 @@ def main():
                         found_other = True
                 if not found_other: 
                     st.write("No additional unique information recorded.")
-            
+
             st.write("")
             with st.expander("📝 Suggest a Spec Update or Correction"):
                 with st.form(f"universal_update_{record.name}"):
