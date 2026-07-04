@@ -239,22 +239,17 @@ def main():
         if len(results) == 1:
             record = results.iloc[0]
             st.subheader(f"{record.get('Make', '')} {record.get('Model', '')} | {record.get('Year Range', '')}")
-            st.divider()
 
-            # --- DYNAMIC TOP SPECIFICATIONS PANEL ---
+            # --- RENDER TOP SPECS IMMEDIATELY UNDER VEHICLE DETAILS (SAME SIZE FONT) ---
             displayed = {'Make', 'Model', 'Year Range', 'Clean_Model'}
-            has_top_specs = False
             
-            # Programmatically find and show Fuel Type & Drivetrain at the very top
             for col in record.index:
                 if col.lower().strip() in ['fuel type', 'drivetrain']:
                     if is_valid(record[col]):
-                        st.write(f"**{col}:** {record[col]}")
-                        has_top_specs = True
-                    displayed.add(col) # Prevent repeating in 'Other Specifications'
+                        st.subheader(f"{col}: {record[col]}")
+                    displayed.add(col) # Safeguard against repeating below
             
-            if has_top_specs:
-                st.divider()
+            st.divider() # Single clean line separator directly before the information blocks
 
             sections = {
                 "🔋 BATTERY DETAILS": ["battery"], 
@@ -279,14 +274,16 @@ def main():
                             if is_valid(val):
                                 if "http" in val.lower() and ("photo" in col.lower() or val.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))):
                                     img_src = val
+                                    click_target = val
                                     if "drive.google.com" in val or "docs.google.com" in val:
                                         match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', val) or re.search(r'id=([a-zA-Z0-9_-]+)', val)
                                         if match:
                                             file_id = match.group(1)
                                             img_src = f"https://drive.google.com/thumbnail?id={file_id}&sz=w400"
+                                            click_target = f"https://drive.google.com/file/d/{file_id}/preview"
 
                                     st.markdown(f"""
-                                        <a href="{val}" target="_blank">
+                                        <a href="{click_target}" target="_blank">
                                             <img src="{img_src}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; margin-bottom:10px;">
                                         </a>
                                     """, unsafe_allow_html=True)
