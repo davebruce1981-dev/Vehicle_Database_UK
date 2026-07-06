@@ -356,6 +356,7 @@ def main():
                 with st.form(f"universal_update_{record.name}"):
                     up_col = st.selectbox("Which field needs updating?", options=[c for c in df.columns if c not in ['Make', 'Model', 'Year Range', 'Clean_Model']])
                     new_val = st.text_input("Correct information / notes:")
+                    
                     if st.form_submit_button("Submit Entry"):
                         payload = {
                             "type": "update", 
@@ -364,11 +365,13 @@ def main():
                             "year": record.get('Year Range', 'N/A'), 
                             "column": up_col, 
                             "newValue": new_val
-                            }
+                        }
+                        try:
+                            # THIS WAS MISSING
+                            requests.post(GOOGLE_SCRIPT_URL, json=payload)
                             st.success("Correction logged for review!")
                         except Exception as e:
                             st.error(f"Submission failed: {e}")
-
             if st.button("⬅️ Back to Search"):
                 st.session_state.show_results = False
                 st.rerun()
