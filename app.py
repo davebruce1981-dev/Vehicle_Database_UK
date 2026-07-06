@@ -223,14 +223,14 @@ def main():
             with st.form("missing_vehicle_form", clear_on_submit=True):
                 n_make = st.text_input("Make")
                 n_model = st.text_input("Model")
-                n_year = st.text_input("Year Range") # <--- THIS IS THE ONE
+                n_year = st.text_input("Year Range")
                 n_details = st.text_input("Additional Details")
                 if st.form_submit_button("Submit Request"):
                     payload = {
                         "type": "new_request", 
                         "make": n_make, 
                         "model": n_model, 
-                        "year_range": n_year,      # <--- MAKE SURE THIS SAYS "year"
+                        "year": n_year, 
                         "details": n_details
                     }
                     try:
@@ -357,15 +357,14 @@ def main():
                     up_col = st.selectbox("Which field needs updating?", options=[c for c in df.columns if c not in ['Make', 'Model', 'Year Range', 'Clean_Model']])
                     new_val = st.text_input("Correct information / notes:")
                     if st.form_submit_button("Submit Entry"):
-                        try:
-                            requests.post(GOOGLE_SCRIPT_URL, json={
-                                "type": "update", 
-                                "make": record['Make'], 
-                                "model": record['Model'], 
-                                "year": record.get('Year Range', ''),
-                                "column": up_col, 
-                                "newValue": new_val
-                            })
+                        payload = {
+                            "type": "update", 
+                            "make": record['Make'], 
+                            "model": record['Model'], 
+                            "year": record.get('Year Range', 'N/A'), 
+                            "column": up_col, 
+                            "newValue": new_val
+                            }
                             st.success("Correction logged for review!")
                         except Exception as e:
                             st.error(f"Submission failed: {e}")
