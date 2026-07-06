@@ -230,7 +230,7 @@ def main():
                         "type": "new_request", 
                         "make": n_make, 
                         "model": n_model, 
-                        "year": n_year,      # <--- MAKE SURE THIS SAYS "year"
+                        "year_range": n_year,      # <--- MAKE SURE THIS SAYS "year"
                         "details": n_details
                     }
                     try:
