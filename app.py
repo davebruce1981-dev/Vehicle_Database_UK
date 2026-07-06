@@ -223,10 +223,16 @@ def main():
             with st.form("missing_vehicle_form", clear_on_submit=True):
                 n_make = st.text_input("Make")
                 n_model = st.text_input("Model")
-                n_year = st.text_input("Year Range")
+                n_year = st.text_input("Year Range") # <--- THIS IS THE ONE
                 n_details = st.text_input("Additional Details")
                 if st.form_submit_button("Submit Request"):
-                    payload = {"type": "new_request", "make": n_make, "model": n_model, "year": n_year, "details": n_details}
+                    payload = {
+                        "type": "new_request", 
+                        "make": n_make, 
+                        "model": n_model, 
+                        "year": n_year,      # <--- MAKE SURE THIS SAYS "year"
+                        "details": n_details
+                    }
                     try:
                         requests.post(GOOGLE_SCRIPT_URL, json=payload)
                         st.success("Request submitted successfully!")
