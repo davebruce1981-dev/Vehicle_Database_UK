@@ -8,7 +8,7 @@ import base64
 st.set_page_config(page_title="Recovery Specs", layout="centered")
 
 # CENTRALIZED URL FOR THE GOOGLE APPS SCRIPT
-GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzr6liTMdbr7-dQVfEXura8cexQGVTZJd76-EsTLSM/dev"
+GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw6smfdYEdOFfJbhfA_oqDEXseztV9COIyjrTv_b-OaLyrG8xMEGVJc-r3vrsdL7sUE/exec"
 
 st.markdown("""
     <style>
