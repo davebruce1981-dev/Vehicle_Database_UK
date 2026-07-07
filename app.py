@@ -8,6 +8,7 @@ import base64
 st.set_page_config(page_title="Recovery Specs", layout="centered")
 
 # CENTRALIZED URL FOR THE GOOGLE APPS SCRIPT
+# *** MAKE SURE THIS IS YOUR NEW /exec URL WITH "ANYONE" PERMISSIONS ***
 GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw6smfdYEdOFfJbhfA_oqDEXseztV9COIyjrTv_b-OaLyrG8xMEGVJc-r3vrsdL7sUE/exec"
 
 st.markdown("""
@@ -234,8 +235,11 @@ def main():
                         "details": n_details
                     }
                     try:
-                        requests.post(GOOGLE_SCRIPT_URL, json=payload)
-                        st.success("Request submitted successfully!")
+                        response = requests.post(GOOGLE_SCRIPT_URL, json=payload)
+                        if "success" in response.text.lower():
+                            st.success("Request submitted successfully!")
+                        else:
+                            st.error(f"Google rejected the request. Response: {response.text}")
                     except Exception as e: 
                         st.error(f"Error submitting: {e}")
     else:
@@ -306,7 +310,7 @@ def main():
                                         bytes_data = img_file.getvalue()
                                         base64_str = base64.b64encode(bytes_data).decode('utf-8')
                                         try:
-                                            requests.post(GOOGLE_SCRIPT_URL, json={
+                                            response = requests.post(GOOGLE_SCRIPT_URL, json={
                                                 "type": "photo", 
                                                 "make": record['Make'], 
                                                 "model": record['Model'], 
@@ -314,7 +318,10 @@ def main():
                                                 "column": col, 
                                                 "image": base64_str
                                             })
-                                            st.success("Uploaded successfully!")
+                                            if "success" in response.text.lower():
+                                                st.success("Uploaded successfully!")
+                                            else:
+                                                st.error(f"Google rejected the request. Response: {response.text}")
                                         except Exception as e:
                                             st.error(f"Upload failed: {e}")
                                 else:
@@ -322,7 +329,7 @@ def main():
                                         new_val = st.text_input("Add info")
                                         if st.form_submit_button("Submit"):
                                             try:
-                                                requests.post(GOOGLE_SCRIPT_URL, json={
+                                                response = requests.post(GOOGLE_SCRIPT_URL, json={
                                                     "type": "update", 
                                                     "make": record['Make'], 
                                                     "model": record['Model'], 
@@ -330,7 +337,10 @@ def main():
                                                     "column": col, 
                                                     "newValue": new_val
                                                 })
-                                                st.success("Submitted successfully!")
+                                                if "success" in response.text.lower():
+                                                    st.success("Submitted successfully!")
+                                                else:
+                                                    st.error(f"Google rejected the request. Response: {response.text}")
                                             except Exception as e:
                                                 st.error(f"Submission failed: {e}")
                             displayed.add(col)
@@ -367,9 +377,11 @@ def main():
                             "newValue": new_val
                         }
                         try:
-                            # THIS WAS MISSING
-                            requests.post(GOOGLE_SCRIPT_URL, json=payload)
-                            st.success("Correction logged for review!")
+                            response = requests.post(GOOGLE_SCRIPT_URL, json=payload)
+                            if "success" in response.text.lower():
+                                st.success("Correction logged for review!")
+                            else:
+                                st.error(f"Google rejected the request. Response: {response.text}")
                         except Exception as e:
                             st.error(f"Submission failed: {e}")
             if st.button("⬅️ Back to Search"):
